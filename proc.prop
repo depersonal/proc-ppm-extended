@@ -1,0 +1,49 @@
+# Enable force 4x msaa by default (it will show up in dev options as disabled, but it is in fact enabled)
+debug.egl.buffcount=4
+debug.egl.force_msaa=true
+
+debug.egl.hw=1
+debug.sf.hw=1
+
+# Set default renderer to Skia (vulkan) cause SystemUI bootloop
+# debug.hwui.renderer=skiavk
+debug.hwui.renderer=skiagl
+ro.hwui.use_skia=true
+ro.hwui.use_vulkan=true
+
+debug.hwui.render_dirty_regions=false
+hwui.render_dirty_regions=false
+
+# Forces performance mode if devices support it, including Snapdragon devices by general
+debug.performance.tuning=1
+
+ro.mtk_perf_fast_start_win=1
+ro.mtk_perf_response_time=1
+ro.mtk_perf_simple_start_win=1
+
+# Disable debugging, thanks to @zaidannn7 and his project Disable Unnecessary Things for this part. 
+debug.atrace.tags.enableflags=0
+debug.mdpcomp.logs=0
+log.tag.stats_log=0
+logcat.live=disable
+logd.logpersistd.enable=false
+logd.statistics=0
+persist.traced.enable=0
+persist.vendor.verbose_logging_enabled=false
+ro.logd.size.stats=0
+ro.logd.size=0
+
+# debug.composition.type=gpu
+debug.composition.type=c2d
+debug.enabletr=true
+debug.overlayui.enable=1
+debug.qctwa.preservebuf=1
+dev.pm.dyn_samplingrate=1
+hw3d.force=1
+# persist.sys.composition.type=gpu
+persist.sys.composition.type=c2d
+persist.sys.ui.hw=1
+ro.fb.mode=1
+ro.sf.compbypass.enable=0
+ro.vold.umsdirtyratio=20
+video.accelerate.hw=1

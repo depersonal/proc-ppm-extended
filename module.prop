@@ -1,0 +1,6 @@
+id=proc_ppm
+name=Proc ppm
+version=v19-0.0.1.9
+versionCode=0000019
+author=7secc, Konstantin
+description=Misc configuration for /proc/ppm/ kernel profile.
