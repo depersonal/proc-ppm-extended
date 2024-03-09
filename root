@@ -2,13 +2,21 @@
 
 PROC_PATH="${0%/*}"
 
-PPM_PATH="$(cat /proc/ppm/*)"
+PPM_PATH="$(cat /proc/ppm/*/*)"
 MODPROC="/data/adb/modules/proc_ppm"
 
-INFO_LOG=${PROC_PATH}/info.log
-ERROR_LOG=${PROC_PATH}/error.log
+INFO_LOG="${PROC_PATH}/info.log"
+ERROR_LOG="${PROC_PATH}/error.log"
 
 # DEBUG_LOG=${PROC_PATH}/debug.log
+
+del_logging() {
+    if [ "$PROC_PATH/*.log" ] && [ "$MODPROC/*_logs" ]
+    then
+        rm -rf $PROC_PATH/*.log \
+            $MODPROC/*_logs
+    fi
+}; del_logging
 
 log_init() {
     :> "$INFO_LOG"
@@ -17,7 +25,7 @@ log_init() {
 }
 
 _log_tweaks() {
-    local log=$1
+    local log="$1"
     shift
     while (( "$#" )); do
         local message="$1"
@@ -66,36 +74,36 @@ bootopt_apply() {
     sync # Sync before execute to avoid crashes
     
     for proc_ppm in $(find /sys/block/*/* -type f -name "queue"); do
-        write "${i}/read_ahead_kb" 2048
-        write "${i}/nr_requests" 512
+        write "${proc_ppm}/read_ahead_kb" 2048
+        write "${proc_ppm}/nr_requests" 512
     done
     
     for proc_ppm in clkgate_enable clkscale_enable hibern8_on_idle_enable; do
-        write /sys/devices/platform/soc/1d84000.ufshc/$i 0
+        write /sys/devices/platform/soc/1d84000.ufshc/$proc_ppm 0
     done
-    log_info "Done."
+    log_info "Done." ""
 }
 
-bootopt_reset() {
+boot_opt_reset() {
     log_info "Resetting parameters from boot optimization"
     
     for proc_ppm in clkgate_enable clkscale_enable hibern8_on_idle_enable; do
-        write /sys/devices/platform/soc/1d84000.ufshc/$i 1
+        write /sys/devices/platform/soc/1d84000.ufshc/$proc_ppm 1
     done
     
     for proc_ppm in $(find /sys/block/*/* -type f -name "queue"); do
-        write "${i}/read_ahead_kb" 128
-        write "${i}/nr_requests" 64
+        write "${proc_ppm}/read_ahead_kb" 128
+        write "${proc_ppm}/nr_requests" 64
     done
-    log_info "Done."
+    log_info "Done." ""
 }
 
-disable_debugging() {
+anti_debugging() {
     log_info "Disabling Debugging"
     sync # Sync before execute to avoid crashes
     
-    for proc_ppm in /sys/block/*/queue/iostats /sys/module/*/parameters/{debug_mask,debug_level}; do
-        write "$i" 0
+    for proc_ppm in $(find /sys/block/*/queue/* -type f -name "iostats") /sys/module/*/parameters/{debug_mask,debug_level}; do
+        write "${proc_ppm}" 0
     done
     
     [ "$(getprop init.svc.logd)" = running ] && stop logd
@@ -108,8 +116,9 @@ disable_debugging() {
         /sys/kernel/{debug/tracing/tracing_on,printk_mode,tracing/tracing_on} \
         /sys/module/{debug/parameters/enable_event_log,ext4/parameters/mballoc_debug,mali/parameters/mali_debug_level,mmc_core/parameters/use_spi_crc,msm_show_resume_irq/parameters/debug_mask,rmnet_data/parameters/rmnet_data_log_level,rpm_smd/parameters/debug_mask,subsystem_restart/parameters/enable_ramdumps} \
         /sys/module/{logd,logger}/parameters/enabled; do
-        write "$i" 0
+        write "${proc_ppm}" 0
     done
+    
     write /proc/sys/vm/stat_interval 10
     write /sys/module/printk/parameters/console_suspend Y
     write /proc/sys/kernel/printk_devkmsg off
@@ -120,7 +129,7 @@ disable_debugging() {
     write /sys/module/printk/parameters/time N
     write /sys/kernel/debug/debug_enabled N
     write /sys/module/ip6_tunnel/parameters/log_ecn_error N
-    log_info "Done."
+    log_info "Done." ""
 }
 
 hrtick() {
@@ -128,44 +137,44 @@ hrtick() {
     sync # Sync before execute to avoid crashes
     
     write /sys/kernel/debug/sched_features HRTICK || # Enable HRTICK
-        log_info "HRTICK is NOT supported" ||
-        log_info "Done."
+        log_info "HRTICK is NOT supported" && log_info "Done." "" ||
+        log_info "Done." ""
 }
 
-kernelfix() {
+kprofile() {
     log_info "Applying Kernel Fix"
     sync # Sync before execute to avoid crashes
     
     write /proc/sys/vm/max_map_count 1048576 # fix bug from mainline
-    log_info "Done."
+    log_info "Done." ""
 }
 
-stune() {
-    log_info "Appying stune tweaks"
+kstune() {
+    log_info "Appying kstune tweaks"
     sync # Sync before execute to avoid crashes
     
-    write /dev/stune/top-app/schedtune.boost 10
-    write /dev/stune/top-app/schedtune.prefer_idle 1
-    write /dev/stune/foreground/schedtune.prefer_idle 1
+    write /dev/kstune/top-app/schedtune.boost 10
+    write /dev/kstune/top-app/schedtune.prefer_idle 0
+    write /dev/kstune/foreground/schedtune.prefer_idle 0
     # write /dev/cpuset/background/cpus 0-3
     # write /dev/cpuset/foreground/cpus 0-7
-    log_info "Done."
+    log_info "Done." ""
 }
-              
-            kernelfix
-            hrtick
-            stune
-            disable_debugging
-            bootopt_reset
-            sync # Sync before execute to avoid crashes
-                       
+
+kprofile
+hrtick
+kstune
+anti_debugging
+boot_opt_reset
+sync # Sync before execute to avoid crashes
+
 fifth() {
 #cause
     if [[ "$(id -u)" -ne 0 ]]
     then
         for logs in $PROC_PATH/ppm_logs
         do
-    	    echo "No root detected. proc_ppm exited." > $logs
+    	    write "No root detected. proc_ppm exited." > $logs
     	done
     	
     	exit 1
@@ -192,143 +201,274 @@ four() {
 #main
 for main in /proc/ppm
 do
-    echo '0' > $main/debug
-    echo '0x0' > $main/func_debug
-    echo '1' > $main/enabled
-    echo '1' > $main/exclusive_core
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${main}/debug" 0
+    write "${main}/func_debug" 0x0
+    write "${main}/enabled" 1
+    write "${main}/exclusive_core" 1
+    log_info "Done." ""
 done
 
 for main in /proc/ppm/profile
 do
-    echo '1' > $main/profile_on
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${main}/profile_on" 1
+    log_info "Done." ""
 done
 
 #second
 for second in /proc/ppm
 do
-    echo 0 0 > $second/policy_status
-    echo 1 0 > $second/policy_status
-    echo 2 0 > $second/policy_status
-    echo 3 0 > $second/policy_status
-    echo 4 0 > $second/policy_status
-    echo 5 0 > $second/policy_status
-    echo 6 0 > $second/policy_status
-    echo 7 0 > $second/policy_status
-    echo 8 0 > $second/policy_status
-    echo 9 0 > $second/policy_status
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${second}/policy_status" 0 0
+    write "${second}/policy_status" 1 0
+    write "${second}/policy_status" 2 0
+    write "${second}/policy_status" 3 0
+    write "${second}/policy_status" 4 0
+    write "${second}/policy_status" 5 0
+    write "${second}/policy_status" 6 0
+    write "${second}/policy_status" 7 0
+    write "${second}/policy_status" 8 0
+    write "${second}/policy_status" 9 0
+    log_info "Done." ""
 done
 
 #third
 for third in /proc/ppm/policy
 do
-    echo 0 0 > $third/sysboost_freq
-    echo 1 0 > $third/sysboost_freq
-    echo 2 0 > $third/sysboost_freq
-    echo 3 0 > $third/sysboost_freq
-    echo 4 0 > $third/sysboost_freq
-    echo 5 0 > $third/sysboost_freq
-    echo 6 0 > $third/sysboost_freq
-    echo 7 0 > $third/sysboost_freq
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${third}/sysboost_freq" 0 0
+    write "${third}/sysboost_freq" 1 0
+    write "${third}/sysboost_freq" 2 0
+    write "${third}/sysboost_freq" 3 0
+    write "${third}/sysboost_freq" 4 0
+    write "${third}/sysboost_freq" 5 0
+    write "${third}/sysboost_freq" 6 0
+    write "${third}/sysboost_freq" 7 0
+    log_info "Done." ""
 done
 
 for third in /proc/ppm/policy
 do
-    echo 0 0 > $third/sysboost_cluster_freq_limit
-    echo 1 0 > $third/sysboost_cluster_freq_limit
-    echo 2 0 > $third/sysboost_cluster_freq_limit
-    echo 3 0 > $third/sysboost_cluster_freq_limit
-    echo 4 0 > $third/sysboost_cluster_freq_limit
-    echo 5 0 > $third/sysboost_cluster_freq_limit
-    echo 6 0 > $third/sysboost_cluster_freq_limit
-    echo 7 0 > $third/sysboost_cluster_freq_limit
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${third}/sysboost_cluster_freq_limit" 0 0
+    write "${third}/sysboost_cluster_freq_limit" 1 0
+    write "${third}/sysboost_cluster_freq_limit" 2 0
+    write "${third}/sysboost_cluster_freq_limit" 3 0
+    write "${third}/sysboost_cluster_freq_limit" 4 0
+    write "${third}/sysboost_cluster_freq_limit" 5 0
+    write "${third}/sysboost_cluster_freq_limit" 6 0
+    write "${third}/sysboost_cluster_freq_limit" 7 0
+    log_info "Done." ""
 done
 
 for third in /proc/ppm/policy
 do
-    echo 0 0 > $third/sysboost_cluster_freqidx_limit
-    echo 1 0 > $third/sysboost_cluster_freqidx_limit
-    echo 2 0 > $third/sysboost_cluster_freqidx_limit
-    echo 3 0 > $third/sysboost_cluster_freqidx_limit
-    echo 4 0 > $third/sysboost_cluster_freqidx_limit
-    echo 5 0 > $third/sysboost_cluster_freqidx_limit
-    echo 6 0 > $third/sysboost_cluster_freqidx_limit
-    echo 7 0 > $third/sysboost_cluster_freqidx_limit
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${third}/sysboost_cluster_freqidx_limit" 0 0
+    write "${third}/sysboost_cluster_freqidx_limit" 1 0
+    write "${third}/sysboost_cluster_freqidx_limit" 2 0
+    write "${third}/sysboost_cluster_freqidx_limit" 3 0
+    write "${third}/sysboost_cluster_freqidx_limit" 4 0
+    write "${third}/sysboost_cluster_freqidx_limit" 5 0
+    write "${third}/sysboost_cluster_freqidx_limit" 6 0
+    write "${third}/sysboost_cluster_freqidx_limit" 7 0
+    log_info "Done." ""
 done
 
 for third in /proc/ppm/policy
 do
-    echo '0' > $third/thermal_limit
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${third}/thermal_limit" 0
+    log_info "Done." ""
 done
 
 #fourth
 for fourth in /proc/sys/kernel
 do
 #mod1
-    echo '0 0 0 0' > $fourth/printk
-    echo '0' > $fourth/panic
-    echo '0' > $fourth/sched_cstate_aware
-    echo '0' > $fourth/sched_energy_aware
-    echo '0' > $fourth/sched_schedstats
-    echo '1' > $fourth/sched_autogroup_enabled
-    echo '1' > $fourth/sched_child_runs_first
-    echo '1' > $fourth/sched_sync_hint_enable
-    echo '1' > $fourth/sched_tunable_scaling
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${fourth}/printk" 0 0 0 0
+    write "${fourth}/panic" 0
+    write "${fourth}/sched_cstate_aware" 0
+    write "${fourth}/sched_energy_aware" 0
+    write "${fourth}/sched_schedstats" 0
+    write "${fourth}/sched_autogroup_enabled" 1
+    write "${fourth}/sched_child_runs_first" 1
+    write "${fourth}/sched_sync_hint_enable" 1
+    write "${fourth}/sched_tunable_scaling" 1
+    log_info "Done." ""
 done
 
 #seventh
 for seventh in /proc/driver/thermal
 do
 #mod2
-    echo polling_interval 0 > $seventh/tztsAll_enable
-    echo switch 1 > $seventh/tztsAll_enable
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${seventh}/tztsAll_enable polling_interval" 0
+    write "${seventh}/tztsAll_enable switch" 1
+    log_info "Done." ""
 done
 
 for eighth in $(find /sys/devices/virtual/thermal/*/* -type f -name "mode")
 do
 #mod3
-    echo $eighth
-    echo 'disabled' > $eighth
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${eighth}"
+    write "${eighth}" disabled
+    log_info "Done." ""
 done
 
 #ninth
 for ninth in /proc/gpufreq
 do
 #mod4
-    echo '0' > $ninth/gpufreq_opp_stress_test
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${ninth}/gpufreq_opp_stress_test" 0
+    log_info "Done." ""
 done
 
 for ninth in /proc/cpufreq
 do
 #mod5
-    echo '0' > $ninth/cpufreq_debug
-    echo '0' > $ninth/cpufreq_sched_disable
-    echo '0' > $ninth/cpufreq_stress_test
-    echo '3' > $ninth/cpufreq_power_mode
+    log_info
+    sync # Sync before execute to avoid crashes
     
-    echo 0 0 > $ninth/cpufreq_dvfs_time_profile
-    echo 1 0 > $ninth/cpufreq_dvfs_time_profile
-    echo 2 0 > $ninth/cpufreq_dvfs_time_profile
-    echo 3 0 > $ninth/cpufreq_dvfs_time_profile
-    echo 4 0 > $ninth/cpufreq_dvfs_time_profile
-    echo 5 0 > $ninth/cpufreq_dvfs_time_profile
+    write "${ninth}/cpufreq_debug" 0
+    write "${ninth}/cpufreq_sched_disable" 0
+    write "${ninth}/cpufreq_stress_test" 0
+    write "${ninth}/cpufreq_power_mode" 3
+    
+    write "${ninth}/cpufreq_dvfs_time_profile" 0 0
+    write "${ninth}/cpufreq_dvfs_time_profile" 1 0
+    write "${ninth}/cpufreq_dvfs_time_profile" 2 0
+    write "${ninth}/cpufreq_dvfs_time_profile" 3 0
+    write "${ninth}/cpufreq_dvfs_time_profile" 4 0
+    write "${ninth}/cpufreq_dvfs_time_profile" 5 0
+    log_info "Done." ""
 done
 
 for ninth in /proc/cpufreq/*/
 do
 #mod6
-    echo '1' > $ninth/cpufreq_turbo_mode
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${ninth}/cpufreq_turbo_mode" 1
+    log_info "Done." ""
 done
 
 #tenth
 for tenth in /proc/sys/vm
 do
 #mod7
-    echo '100' > $tenth/swappiness
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${tenth}/swappiness" 80
+    log_info "Done." ""
+done
+
+t1() {
+    #eight
+    for eight in /proc/cpufreq
+    do
+    #mod8 big thanks to hoshiyomi kprofile configuration
+        log_info
+        sync # Sync before execute to avoid crashes
+        
+        write "${eight}/cpufreq_imax_thermal_protect "0
+        write "${eight}/cpufreq_cci_mode" 1
+        write "${eight}/cpufreq_imax_enable" 1
+        write "${eight}/cpufreq_sched_disable" 1
+        write "${eight}/cpufreq_power_mode" 3
+        log_info "Done." ""
+    done
+}
+
+t2() {
+    for eight in /proc/irq/240
+    do
+    #mod9 big thanks to hoshiyomi kprofile configuration
+        log_info
+        sync # Sync before execute to avoid crashes
+        
+        write "${eight}/smp_affinity_list" 1
+        log_info "Done." ""
+    done
+}
+
+t3() {
+    for eight in /sys/module/cpuidle/parameters
+    do
+    #mod10 big thanks to hoshiyomi kprofile configuration
+        log_info
+        sync # Sync before execute to avoid crashes
+        
+        write "${eight}/off" 1
+        log_info "Done." ""
+    done
+}
+
+t1
+t2
+t3
+sync # Sync before execute to avoid crashes
+
+#nine
+for nine in /sys/module/ged/parameters
+do
+#mod11 suggested by hoshiyomi
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "${nine}/boost_amp" 1
+    write "${nine}/boost_extra" 1
+    write "${nine}/boost_gpu_enable" 1
+    write "${nine}/cpu_boost_policy" 1
+    write "${nine}/enable_cpu_boost" 1
+    write "${nine}/ged_boost_enable" 1
+    write "${nine}/ged_smart_boost" 1
+    write "${nine}/gpu_dvfs_enable" 1
+    write "${nine}/gx_boost_on" 1
+    write "${nine}/gx_dfps" 1
+    write "${nine}/gx_force_cpu_boost" 1
+    write "${nine}/gx_game_mode" 1
+    write "${nine}/is_GED_KPI_enabled" 1
+    log_info "Done." ""
 done
 
 for logs in $PROC_PATH/ppm_logs
 do
 #logs
-    echo $PPM_PATH > $logs
+    log_info
+    sync # Sync before execute to avoid crashes
+    
+    write "$PPM_PATH" $logs
+    log_info "Done." ""
+    
+    echo $PPM_PATH >> $logs
 done
 sync # Sync before execute to avoid crashes

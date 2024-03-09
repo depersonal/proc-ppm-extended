@@ -17,7 +17,9 @@ three() {
 #beginning
     if [[ -n "$PROC_PATH/root" ]]
     then
-        sh "$PROC_PATH/root"
+        sh "${PROC_PATH}/root"
+    else
+        exec "${PROC_PATH}/root"
     fi
 }; three
 
@@ -31,5 +33,5 @@ twelfth() {
 }; twelfth
 
 six() {
-    resetprop -v -n --file "$PROC_PATH/proc.prop"
+    resetprop -v -n --file "${PROC_PATH}/proc.prop"
 }; six

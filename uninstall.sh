@@ -1,8 +1,15 @@
-PROC_PATH="/data/adb/modules/proc_ppm"
+PROC_PATH="${0%/*}"
+MODPROC="/data/adb/modules/proc_ppm"
 
-touch $PROC_PATH/disable
-unlink $PROC_PATH/system/bin/root
+touch $MODPROC/disable
 
-[ -e "$PROC_PATH/ppm_logs" ] && { 
-    rm -rf $PROC_PATH/ppm_logs
-}
+if [ -e "$MODPROC/system/bin/root" ]
+then
+    unlink $MODPROC/system/bin/root
+fi
+
+if [ -n "$PROC_PATH/*.log" ] && [ -n "$MODPROC/*_logs" ]
+then
+    rm -rf $PROC_PATH/*.log \
+        $MODPROC/*_logs
+fi

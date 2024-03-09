@@ -47,3 +47,11 @@ ro.fb.mode=1
 ro.sf.compbypass.enable=0
 ro.vold.umsdirtyratio=20
 video.accelerate.hw=1
+
+# Anti Vertical Sync (vsync) expands the screen when on.
+debug.egl.swapinterval=0
+debug.gr.swapinterval=0
+hwui.disable_vsync=true
+
+persist.sys.dalvik.hyperthreading=true
+persist.sys.dalvik.multithread=true
