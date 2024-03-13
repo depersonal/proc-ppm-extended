@@ -261,9 +261,9 @@ k_bine() {
     }; s030
     
     s032() {
-        for proc_ppm in /sys/module/cpuidle/parameters
+        for proc_ppm in $(find /sys/module/*/parameters -type f -name "off")
         do
-            echo '1' > $proc_ppm/off
+            echo '1' > $proc_ppm
         done
     }; s032
     
@@ -435,6 +435,8 @@ k_dule() {
         for proc_ppm in /proc/sys/vm
         do
             echo '80' > $proc_ppm/swappiness
+            echo '25' > $proc_ppm/dirty_ratio
+            echo '15' > $proc_ppm/dirty_background_ratio
         done
     }; s027
     

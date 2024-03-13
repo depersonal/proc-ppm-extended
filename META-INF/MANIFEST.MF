@@ -1,0 +1,31 @@
+Manifest-Version: 1.0
+Built-By: Signflinger
+Created-By: Android Gradle 8.0.2
+
+Name: META-INF/com/google/android/update-binary
+SHA1-Digest: 19crrrNJIzLqdaei5jSFGjLHWJo=
+
+Name: META-INF/com/google/android/updater-script
+SHA1-Digest: Lzl1y1cC6TvXytLj6okU81/P8AA=
+
+Name: customize.sh
+SHA1-Digest: KeigFMxatPts46bWTvt9dW9HnfY=
+
+Name: module.prop
+SHA1-Digest: zk6TErbyIeEFNGo2J7AqFxto8eE=
+
+Name: post-fs-data.sh
+SHA1-Digest: xb/jtZ9ntYWpiaKtDlhvWBRww+o=
+
+Name: proc.prop
+SHA1-Digest: ir9zt+BTszncpTxuEFP5Cb0mXoo=
+
+Name: root
+SHA1-Digest: ylwQP3WBUSTXgmFFIzRScQtO2G8=
+
+Name: service.sh
+SHA1-Digest: ZDgy4x2Txr1QGp4cDhopleD6OLs=
+
+Name: uninstall.sh
+SHA1-Digest: u/WIKNMcqZyhd0SDwbIjOk6HMoA=
+

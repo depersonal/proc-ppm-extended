@@ -9,7 +9,7 @@ debug.sf.hw=1
 # debug.hwui.renderer=skiavk
 debug.hwui.renderer=skiagl
 ro.hwui.use_skia=true
-ro.hwui.use_vulkan=true
+# ro.hwui.use_vulkan=true
 
 debug.hwui.render_dirty_regions=false
 hwui.render_dirty_regions=false
@@ -34,15 +34,15 @@ ro.logd.size.stats=0
 ro.logd.size=0
 
 # Thanks to Konstantin and his project
-# debug.composition.type=gpu
-debug.composition.type=c2d
+debug.composition.type=gpu
+# debug.composition.type=c2d
 debug.enabletr=true
 debug.overlayui.enable=1
 debug.qctwa.preservebuf=1
 dev.pm.dyn_samplingrate=1
 hw3d.force=1
-# persist.sys.composition.type=gpu
-persist.sys.composition.type=c2d
+persist.sys.composition.type=gpu
+# persist.sys.composition.type=c2d
 persist.sys.ui.hw=1
 ro.fb.mode=1
 ro.sf.compbypass.enable=0
@@ -60,3 +60,6 @@ persist.sys.dalvik.multithread=true
 # dca084a, 901b871, 2ec6373 by YiHo Cheng, davidchao, Cyan_Hsieh
 persist.vendor.disable.thermal.control=1
 persist.vendor.disable.usb.overheat.mitigation=1
+
+ro.config.disable.hw_accel=false
+ro.config.enable.hw_accel=true

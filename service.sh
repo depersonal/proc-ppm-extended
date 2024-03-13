@@ -12,6 +12,30 @@ s005() {
     fi
 }; s005
 
+s006() {
+    (while :
+    do
+        sf=$(service list | grep -c "SurfaceFlinger")
+    
+        if [ $sf -eq 1 ]
+        then
+            service call SurfaceFlinger 1008 i32 1
+            break
+        else
+            sleep 2
+        fi
+    done
+    ) &
+}; s006
+
+# s007() {
+#     
+# }; s007
+
+# s008() {
+#     
+# }; s008
+
 s009() {
     # after boot v1
     if [[ "$(getprop sys.boot_completed)" == 1 ]] && [[ ! -d "$PROC_PATH/disable" ]]; then
