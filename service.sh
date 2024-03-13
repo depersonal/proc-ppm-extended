@@ -1,32 +1,51 @@
 PROC_PATH="${0%/*}"
 APPROVE="$PROC_PATH/module.prop"
-VERIFY="[+] Misc configuration for /proc/ppm/ kernel profile."
+VERIFY="[+] Miscellaneous configurations for optimizing the /proc/ppm/ kernel profile."
+INACTIVE_DESC="[-] Module is inactive"
 
-five() {
-#alter
-    if [[ "$(getprop sys.boot_completed)" == 1 ]] && {
-        [[ ! -d "$PROC_PATH/disable" ]]
-    }
-    
-    then
-        sleep 25
-        
-        [ -e "$PROC_PATH/root" ] && {
-            sh "${PROC_PATH}/root"
-        }
+# Function to confirm module status and update module description accordingly
+s005() {
+    if [[ -e "$PROC_PATH/disable" ]]; then
+        sed -i "/description=/c description=${INACTIVE_DESC}" "$APPROVE"
     else
-        exec "${PROC_PATH}/root"
+        sed -i "/description=/c description=${VERIFY}" "$APPROVE"
     fi
-}; five
+}; s005
 
-thirteenth() {
-    . "${PROC_PATH}/root"
-    
-    log_info "Finished!"
-}; thirteenth
+s009() {
+    # after boot v1
+    if [[ "$(getprop sys.boot_completed)" == 1 ]] && [[ ! -d "$PROC_PATH/disable" ]]; then
+        sleep 25
+        if [[ -f "$PROC_PATH/root" ]]; then
+            sh "${PROC_PATH}/root"
+            # Check if root script has been executed successfully
+            if [[ $? -eq 0 ]]; then
+                echo "Root script executed successfully"
+            else
+                echo "Failed to execute root script"
+                exit 1
+            fi
+        fi
+    else
+        sleep 25
+        if [[ -f "$PROC_PATH/root" ]]; then
+            exec "${PROC_PATH}/root"
+        fi
+    fi
+}; s009
 
-seven() {
+s010() {
+    # after boot v2
+    if [[ -f "$PROC_PATH/root" ]]; then
+        . "${PROC_PATH}/root"
+        log_info "Finished!"
+    fi
+}; s010
+
+s011() {
+    # after boot v3
     resetprop -v -n --file "${PROC_PATH}/proc.prop"
-}; seven
+}; s011
 
-sed -i "/description=/c description=${VERIFY}" $APPROVE
+# Update module description
+s005

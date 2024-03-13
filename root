@@ -2,21 +2,23 @@
 
 PROC_PATH="${0%/*}"
 
-PPM_PATH="$(cat /proc/ppm/*/*)"
+PPM_PATH="$(cat /proc/ppm/*/*); $(cat /proc/ppm/*)"
 MODPROC="/data/adb/modules/proc_ppm"
 
 INFO_LOG="${PROC_PATH}/info.log"
 ERROR_LOG="${PROC_PATH}/error.log"
 
-# DEBUG_LOG=${PROC_PATH}/debug.log
+# DEBUG_LOG="${PROC_PATH}/debug.log"
 
-del_logging() {
-    if [ "$PROC_PATH/*.log" ] && [ "$MODPROC/*_logs" ]
-    then
-        rm -rf $PROC_PATH/*.log \
-            $MODPROC/*_logs
+_del_logging() {
+    if [ -f "$PROC_PATH/error.log" ] || [ -f "$PROC_PATH/info.log" ]; then
+        if [ -f "$MODPROC/proc_ppm" ]; then
+            rm -rf "$PROC_PATH/error.log" \
+                "$PROC_PATH/info.log" \
+                "$MODPROC/ppm_logs"
+        fi
     fi
-}; del_logging
+}; _del_logging
 
 log_init() {
     :> "$INFO_LOG"
@@ -24,10 +26,11 @@ log_init() {
     # :> "$DEBUG_LOG" 
 }
 
-_log_tweaks() {
-    local log="$1"
+_log_proc() {
+    local log=$1
     shift
-    while (( "$#" )); do
+    while [ "$#" -gt 0 ]
+    do
         local message="$1"
         echo "[$(date "+%H:%M:%S")] $message" >> "$log"
         shift
@@ -35,15 +38,15 @@ _log_tweaks() {
 }
 
 log_info() {
-    _log_tweaks "$INFO_LOG" "$@"
+    _log_proc "$INFO_LOG" "$@"
 }
 
 log_error() {
-    _log_tweaks "$ERROR_LOG" "$@"
+    _log_proc "$ERROR_LOG" "$@"
 }
 
 # log_debug() {
-#     _log_tweaks "$DEBUG_LOG" "$@"
+#     _log_proc "$DEBUG_LOG" "$@"
 # }
 
 write() {
@@ -64,411 +67,389 @@ write() {
     return 0
 }
 
-bootopt_apply() {
+boot_opt_apply() {
     log_info "Device: $(getprop ro.product.system.model)" \
         "Brand: $(getprop ro.product.system.brand)" \
         "Kernel: $(uname -r)" \
-        "Rom build type: $(getprop ro.system.build.type)" \
+        "Rom build-type: $(getprop ro.system.build.type)" \
         "Android Version: $(getprop ro.system.build.version.release)" \
         "Applying boot optimization"
-    sync # Sync before execute to avoid crashes
     
-    for proc_ppm in $(find /sys/block/*/* -type f -name "queue"); do
-        write "${proc_ppm}/read_ahead_kb" 2048
-        write "${proc_ppm}/nr_requests" 512
+    sync # Sinkronisasi sebelum eksekusi untuk menghindari kehilangan data
+    
+    # Mengoptimalkan read_ahead_kb dan nr_requests
+    for proc_ppm in $(find /sys/block/*/queue/* -type f -name "read_ahead_kb" -o -name "nr_requests")
+    do
+        [ -f "$proc_ppm" ] && {
+            write "${proc_ppm}" 2048 || log_error "Failed to write to $proc_ppm"
+            write "${proc_ppm}" 512 || log_error "Failed to write to $proc_ppm"
+        }
     done
     
-    for proc_ppm in clkgate_enable clkscale_enable hibern8_on_idle_enable; do
-        write /sys/devices/platform/soc/1d84000.ufshc/$proc_ppm 0
+    # Menonaktifkan clkgate_enable, clkscale_enable, dan hibern8_on_idle_enable
+    for proc_ppm in $(find /sys/devices/platform/*/*/* -type f -name "clkgate_enable" -o -name "clkscale_enable" -o -name "hibern8_on_idle_enable")
+    do
+        [ -f "$proc_ppm" ] && {
+            write "$proc_ppm" 0 || log_error "Failed to write to $proc_ppm"
+        }
     done
+    
     log_info "Done." ""
 }
 
 boot_opt_reset() {
     log_info "Resetting parameters from boot optimization"
     
-    for proc_ppm in clkgate_enable clkscale_enable hibern8_on_idle_enable; do
-        write /sys/devices/platform/soc/1d84000.ufshc/$proc_ppm 1
+    sync # Sinkronisasi sebelum eksekusi untuk menghindari kehilangan data
+    
+    # Mengaktifkan kembali clkgate_enable, clkscale_enable, dan hibern8_on_idle_enable
+    for proc_ppm in $(find /sys/devices/platform/*/*/* -type f -name "clkgate_enable" -o -name "clkscale_enable" -o -name "hibern8_on_idle_enable")
+    do
+        [ -f "$proc_ppm" ] && {
+            write "$proc_ppm" 1 || log_error "Failed to write to $proc_ppm"
+        }
     done
     
-    for proc_ppm in $(find /sys/block/*/* -type f -name "queue"); do
-        write "${proc_ppm}/read_ahead_kb" 128
-        write "${proc_ppm}/nr_requests" 64
+    # Mengatur kembali nilai read_ahead_kb dan nr_requests ke nilai default
+    for proc_ppm in $(find /sys/block/*/queue/* -type f -name "read_ahead_kb" -o -name "nr_requests")
+    do
+        [ -f "$proc_ppm" ] && {
+            write "${proc_ppm}" 128 || log_error "Failed to write to $proc_ppm"
+            write "${proc_ppm}" 64 || log_error "Failed to write to $proc_ppm"
+        }
     done
+    
     log_info "Done." ""
-}
+}; boot_opt_reset
 
 anti_debugging() {
     log_info "Disabling Debugging"
-    sync # Sync before execute to avoid crashes
     
-    for proc_ppm in $(find /sys/block/*/queue/* -type f -name "iostats") /sys/module/*/parameters/{debug_mask,debug_level}; do
-        write "${proc_ppm}" 0
+    sync # Sinkronisasi sebelum eksekusi untuk menghindari kehilangan data
+    
+    # Menonaktifkan debugging di berbagai file
+    for proc_ppm in $(find /sys/block/*/queue/* -type f -name "iostats") \
+        $(find /sys/module/*/parameters/* -type f -name "debug_mask" -o -name "debug_level")
+    do
+        [ -f "$proc_ppm" ] && {
+            write "$proc_ppm" 0 || log_error "Failed to write to $proc_ppm"
+        }
     done
     
-    [ "$(getprop init.svc.logd)" = running ] && stop logd
-    [ "$(getprop init.svc.statsd)" = running ] && stop statsd
+    # Menghentikan servis logd jika sedang berjalan
+    if [ "$(getprop init.svc.logd)" = running ]; then
+        stop logd || log_error "Failed to stop logd service"
+    fi
     
+    # Menghentikan servis statsd jika sedang berjalan
+    if [ "$(getprop init.svc.statsd)" = running ]; then
+        stop statsd || log_error "Failed to stop statsd service"
+    fi
+    
+    # Menonaktifkan debugging di berbagai file dan direktori
     for proc_ppm in /proc/sys/{debug/exception-trace,fs/dir-notify-enable} \
         /proc/sys/debug/kernel/{compat_log,sched_schedstats} \
         /proc/sys/vm/{block_dump,oom_dump_tasks} \
         /sys/kernel/debug/kgsl/kgsl-3d0/{log_level_cmd,log_level_ctxt,log_level_mem,log_level_pwr} \
         /sys/kernel/{debug/tracing/tracing_on,printk_mode,tracing/tracing_on} \
         /sys/module/{debug/parameters/enable_event_log,ext4/parameters/mballoc_debug,mali/parameters/mali_debug_level,mmc_core/parameters/use_spi_crc,msm_show_resume_irq/parameters/debug_mask,rmnet_data/parameters/rmnet_data_log_level,rpm_smd/parameters/debug_mask,subsystem_restart/parameters/enable_ramdumps} \
-        /sys/module/{logd,logger}/parameters/enabled; do
-        write "${proc_ppm}" 0
+        /sys/module/{logd,logger}/parameters/enabled
+    do
+        [ -f "$proc_ppm" ] && {
+            write "$proc_ppm" 0 || log_error "Failed to write to $proc_ppm"
+        }
     done
     
-    write /proc/sys/vm/stat_interval 10
-    write /sys/module/printk/parameters/console_suspend Y
-    write /proc/sys/kernel/printk_devkmsg off
-    write /proc/sys/kernel/printk 0 0 0 0
-    write /sys/module/printk/parameters/cpu N
-    write /sys/module/printk/parameters/ignore_loglevel Y
-    write /sys/module/printk/parameters/pid N
-    write /sys/module/printk/parameters/time N
-    write /sys/kernel/debug/debug_enabled N
-    write /sys/module/ip6_tunnel/parameters/log_ecn_error N
+    # Menonaktifkan debugging di berbagai file kernel
+    for proc_ppm in /proc/sys/kernel
+    do
+        write "$proc_ppm/printk" '0 0 0 0' || log_error "Failed to write to $proc_ppm/printk"
+        write "$proc_ppm/printk_devkmsg" off || log_error "Failed to write to $proc_ppm/printk_devkmsg"
+    done
+    
+    # Menonaktifkan debugging di berbagai modul kernel
+    write /proc/sys/vm/stat_interval 10 || log_error "Failed to write to /proc/sys/vm/stat_interval"
+    write /sys/kernel/debug/debug_enabled N || log_error "Failed to write to /sys/kernel/debug/debug_enabled"
+    write /sys/module/ip6_tunnel/parameters/log_ecn_error N || log_error "Failed to write to /sys/module/ip6_tunnel/parameters/log_ecn_error"
+    write /sys/module/overheat_mitigation/parameters/enable 0 || log_error "Failed to write to /sys/module/overheat_mitigation/parameters/enable"
+    
+    # Menonaktifkan debugging di modul printk
+    for proc_ppm in /sys/module/printk/parameters
+    do
+        write "$proc_ppm/console_suspend" Y || log_error "Failed to write to $proc_ppm/console_suspend"
+        write "$proc_ppm/cpu" N || log_error "Failed to write to $proc_ppm/cpu"
+        write "$proc_ppm/ignore_loglevel" Y || log_error "Failed to write to $proc_ppm/ignore_loglevel"
+        write "$proc_ppm/pid" N || log_error "Failed to write to $proc_ppm/pid"
+        write "$proc_ppm/time" N || log_error "Failed to write to $proc_ppm/time"
+    done
+    
     log_info "Done." ""
-}
+}; anti_debugging
 
 hrtick() {
     log_info "Trying to enable HRTICK"
-    sync # Sync before execute to avoid crashes
+    sync # Sinkronisasi sebelum eksekusi untuk menghindari kehilangan data
     
-    write /sys/kernel/debug/sched_features HRTICK || # Enable HRTICK
-        log_info "HRTICK is NOT supported" && log_info "Done." "" ||
-        log_info "Done." ""
-}
+    # Mencari semua file di direktori /proc/ppm dan mencoba mengaktifkan HRTICK
+    for proc_ppm in /sys/kernel/debug/sched_features/*
+    do
+        write "$proc_ppm" HRTICK && \
+            log_info "HRTICK has been enabled in $proc_ppm" || \
+            { 
+                log_info "HRTICK is NOT supported in $proc_ppm" 
+                log_info "Done." ""
+            }
+    done
+}; hrtick
 
 kprofile() {
     log_info "Applying Kernel Fix"
-    sync # Sync before execute to avoid crashes
+    sync # Sinkronisasi sebelum eksekusi untuk menghindari kehilangan data
     
-    write /proc/sys/vm/max_map_count 1048576 # fix bug from mainline
+    # Mengatur nilai max_map_count untuk memperbaiki bug dari mainline kernel
+    for proc_ppm in /proc/sys/vm/max_map_count
+    do
+        write "$proc_ppm" 1048576 || log_error "Failed to write to $proc_ppm"
+    done
+    
     log_info "Done." ""
-}
+}; kprofile
 
 kstune() {
-    log_info "Appying kstune tweaks"
-    sync # Sync before execute to avoid crashes
+    log_info "Applying stune tweaks"
+    sync # Sync before execution to avoid crashes
     
-    write /dev/kstune/top-app/schedtune.boost 10
-    write /dev/kstune/top-app/schedtune.prefer_idle 0
-    write /dev/kstune/foreground/schedtune.prefer_idle 0
-    # write /dev/cpuset/background/cpus 0-3
-    # write /dev/cpuset/foreground/cpus 0-7
-    log_info "Done." ""
-}
+    # File dan nilai yang akan dimodifikasi
+    file_boost="/dev/stune/top-app/schedtune.boost"
+    file_prefer_idle1="/dev/stune/top-app/schedtune.prefer_idle"
+    file_prefer_idle2="/dev/stune/foreground/schedtune.prefer_idle"
+    
+    value_boost="10"
+    value_prefer_idle1="0"
+    value_prefer_idle2="0"
+    
+    # Menulis nilai ke setiap file
+    write "$value_boost" "$file_boost"
+    write "$value_prefer_idle1" "$file_prefer_idle1"
+    write "$value_prefer_idle2" "$file_prefer_idle2"
+    
+    # Komentar: Menulis nilai ke setiap file cpuset
+    # write /dev/cpuset/background/cpus '0-3'
+    # write /dev/cpuset/foreground/cpus '0-7'
+    
+    log_info "Done."
+}; kstune
 
-kprofile
-hrtick
-kstune
-anti_debugging
-boot_opt_reset
-sync # Sync before execute to avoid crashes
+k_bine() {
+    # suggested by devs
+    s029() {
+        for proc_ppm in /proc/cpufreq
+        do
+            echo '0' > $proc_ppm/cpufreq_imax_thermal_protect
+            echo '1' > $proc_ppm/cpufreq_cci_mode
+            echo '1' > $proc_ppm/cpufreq_imax_enable
+            echo '1' > $proc_ppm/cpufreq_sched_disable
+            echo '3' > $proc_ppm/cpufreq_power_mode
+        done
+    }; s029
+    
+    s030() {
+        for proc_ppm in /proc/irq/240
+        do
+            echo '1' > $proc_ppm/smp_affinity_list
+        done
+    }; s030
+    
+    s032() {
+        for proc_ppm in /sys/module/cpuidle/parameters
+        do
+            echo '1' > $proc_ppm/off
+        done
+    }; s032
+    
+    s035() {
+        for proc_ppm in $(find /sys/module/ged/parameters/* -type f -name "boost_amp" -o -name "boost_extra" -o -name "boost_gpu_enable" -o -name "cpu_boost_policy" -o -name "enable_cpu_boost" -o -name "ged_boost_enable" -o -name "ged_force_mdp_enable" -o -name "ged_smart_boost" -o -name "gpu_dvfs_enable" -o -name "gx_boost_on" -o -name "gx_dfps" -o -name "gx_force_cpu_boost" -o -name "gx_game_mode" -o -name "is_GED_KPI_enabled" -o -name "gx_frc_mode")
+        do
+            echo '1' > $proc_ppm
+        done
+    }; s035
+    
+    s036() {
+        for proc_ppm in $(find /sys/module/ged/parameters/* -type f -name "gpu_debug_enable" -o -name "deboost_reduce" -o -name "ged_log_trace_enable")
+        do
+            echo '0' > $proc_ppm
+        done
+    }; s036
+}; k_bine
 
-fifth() {
-#cause
+s012() {
+# make sure v1
     if [[ "$(id -u)" -ne 0 ]]
     then
         for logs in $PROC_PATH/ppm_logs
         do
-    	    write "No root detected. proc_ppm exited." > $logs
+    	    echo "No root detected. proc_ppm exited." > $logs
     	done
     	
     	exit 1
     fi
-}; fifth
+}; s012
 
 grep -q android /proc/cmdline && { 
     ANDROID=true
 }
 
-four() {
-#center
-    if [[ "$(getprop sys.boot_completed)" -ne 1 ]] && {
-        [[ ! -d "$MODPROC/disable" ]]
-    }
+k_dule() {
+    s013() {
+    # make sure v2
+        if [[ "$(getprop sys.boot_completed)" -ne 1 ]] && {
+            [[ ! -d "$MODPROC/disable" ]]
+        }
+        then
+            su -lp 2000 -c "cmd notification post -S bigtext -t '7secc' 'Tag' 'proc_ppm executed'"
+        else
+            su 2000 -c "cmd notification post -S bigtext -t '7secc' 'Tag' 'proc_ppm executed'"
+        fi
+    }; s013
     
-    then
-        su -lp 2000 -c "cmd notification post -S bigtext -t '7secc' 'Tag' 'proc_ppm executed'"
-    else
-        su 2000 -c "cmd notification post -S bigtext -t '7secc' 'Tag' 'proc_ppm executed'"
-    fi
-}; four
+    s014() {
+        for proc_ppm in /proc/ppm
+        do
+            echo '0' > $proc_ppm/debug
+            echo '0x0' > $proc_ppm/func_debug
+            echo '1' > $proc_ppm/enabled
+            echo '1' > $proc_ppm/exclusive_core
+        done
+    }; s014
+    
+    s015() {
+        for proc_ppm in /proc/ppm/profile
+        do
+            echo '1' > $proc_ppm/profile_on
+        done
+    }; s015
+    
+    s016() {
+        for proc_ppm in /proc/ppm; do
+            for status in $(seq 0 9); do
+                if [ "$status" -eq 8 ]; then
+                    echo "$status 1" > "$proc_ppm/policy_status"
+                else
+                    echo "$status 0" > "$proc_ppm/policy_status"
+                fi
+            done
+        done
+    }; s016
+    
+    s017() {
+        for proc_ppm in /proc/ppm/policy; do
+            for freq in $(seq 0 7); do
+                echo "$freq 0" > "$proc_ppm/sysboost_freq"
+            done
+        done
+    }; s017
+    
+    s018() {
+        for proc_ppm in /proc/ppm/policy; do
+            for limit in $(seq 0 7); do
+                echo "$limit 0" > "$proc_ppm/sysboost_cluster_freq_limit"
+            done
+        done
+    }; s018
+    
+    s019() {
+        for proc_ppm in /proc/ppm/policy; do
+            for limit in $(seq 0 7); do
+                echo "$limit 0" > "$proc_ppm/sysboost_cluster_freqidx_limit"
+            done
+        done
+    }; s019
+    
+    s020() {
+        for proc_ppm in /proc/ppm/policy
+        do
+            echo '0' > $proc_ppm/thermal_limit
+        done
+    }; s020
+    
+    s021() {
+        for proc_ppm in /proc/sys/kernel
+        do
+            echo '0 0 0 0' > $proc_ppm/printk
+            echo '0' > $proc_ppm/panic
+            echo '0' > $proc_ppm/sched_cstate_aware
+            echo '0' > $proc_ppm/sched_energy_aware
+            echo '0' > $proc_ppm/sched_schedstats
+            echo '1' > $proc_ppm/sched_autogroup_enabled
+            echo '1' > $proc_ppm/sched_child_runs_first
+            echo '1' > $proc_ppm/sched_sync_hint_enable
+            echo '1' > $proc_ppm/sched_tunable_scaling
+        done
+    }; s021
+    
+    s022() {
+        for proc_ppm in /proc/driver/thermal
+        do
+            echo polling_interval 0 > $proc_ppm/tztsAll_enable
+            echo switch 1 > $proc_ppm/tztsAll_enable
+        done
+    }; s022
+    
+    s023() {
+        for proc_ppm in $(find /sys/devices/virtual/thermal/*/* -type f -name "mode")
+        do
+            echo 'disabled' > $proc_ppm
+        done
+    }; s023
+    
+    s024() {
+        for proc_ppm in /proc/gpufreq
+        do
+            echo '0' > $proc_ppm/gpufreq_opp_stress_test
+        done
+    }; s024
+    
+    s025() {
+        for proc_ppm in /proc/cpufreq
+        do
+            echo '0' > $proc_ppm/cpufreq_debug
+            echo '0' > $proc_ppm/cpufreq_sched_disable
+            echo '0' > $proc_ppm/cpufreq_stress_test
+            echo '3' > $proc_ppm/cpufreq_power_mode
+            
+            for profile in {0..5}
+            do
+                echo "$profile 0" > $proc_ppm/cpufreq_dvfs_time_profile
+            done
+        done
+    }; s025
+    
+    s026() {
+        for proc_ppm in /proc/cpufreq/*/
+        do
+            echo '1' > $proc_ppm/cpufreq_turbo_mode
+        done
+    }; s026
+    
+    s027() {
+        for proc_ppm in /proc/sys/vm
+        do
+            echo '80' > $proc_ppm/swappiness
+        done
+    }; s027
+    
+    s028() {
+        for proc_ppm in $(find /sys/devices/virtual/thermal/*/*/* -type f -name "skin-therm-adc" -o -name "skin-therm-monitor")
+        do
+            echo 'disable' > $proc_ppm
+        done
+    }; s028
+}; k_dule
 
-#main
-for main in /proc/ppm
+for logger in $PROC_PATH/ppm_logs
 do
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${main}/debug" 0
-    write "${main}/func_debug" 0x0
-    write "${main}/enabled" 1
-    write "${main}/exclusive_core" 1
-    log_info "Done." ""
+# logger
+    echo $PPM_PATH > $logger
 done
 
-for main in /proc/ppm/profile
-do
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${main}/profile_on" 1
-    log_info "Done." ""
-done
-
-#second
-for second in /proc/ppm
-do
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${second}/policy_status" 0 0
-    write "${second}/policy_status" 1 0
-    write "${second}/policy_status" 2 0
-    write "${second}/policy_status" 3 0
-    write "${second}/policy_status" 4 0
-    write "${second}/policy_status" 5 0
-    write "${second}/policy_status" 6 0
-    write "${second}/policy_status" 7 0
-    write "${second}/policy_status" 8 0
-    write "${second}/policy_status" 9 0
-    log_info "Done." ""
-done
-
-#third
-for third in /proc/ppm/policy
-do
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${third}/sysboost_freq" 0 0
-    write "${third}/sysboost_freq" 1 0
-    write "${third}/sysboost_freq" 2 0
-    write "${third}/sysboost_freq" 3 0
-    write "${third}/sysboost_freq" 4 0
-    write "${third}/sysboost_freq" 5 0
-    write "${third}/sysboost_freq" 6 0
-    write "${third}/sysboost_freq" 7 0
-    log_info "Done." ""
-done
-
-for third in /proc/ppm/policy
-do
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${third}/sysboost_cluster_freq_limit" 0 0
-    write "${third}/sysboost_cluster_freq_limit" 1 0
-    write "${third}/sysboost_cluster_freq_limit" 2 0
-    write "${third}/sysboost_cluster_freq_limit" 3 0
-    write "${third}/sysboost_cluster_freq_limit" 4 0
-    write "${third}/sysboost_cluster_freq_limit" 5 0
-    write "${third}/sysboost_cluster_freq_limit" 6 0
-    write "${third}/sysboost_cluster_freq_limit" 7 0
-    log_info "Done." ""
-done
-
-for third in /proc/ppm/policy
-do
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${third}/sysboost_cluster_freqidx_limit" 0 0
-    write "${third}/sysboost_cluster_freqidx_limit" 1 0
-    write "${third}/sysboost_cluster_freqidx_limit" 2 0
-    write "${third}/sysboost_cluster_freqidx_limit" 3 0
-    write "${third}/sysboost_cluster_freqidx_limit" 4 0
-    write "${third}/sysboost_cluster_freqidx_limit" 5 0
-    write "${third}/sysboost_cluster_freqidx_limit" 6 0
-    write "${third}/sysboost_cluster_freqidx_limit" 7 0
-    log_info "Done." ""
-done
-
-for third in /proc/ppm/policy
-do
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${third}/thermal_limit" 0
-    log_info "Done." ""
-done
-
-#fourth
-for fourth in /proc/sys/kernel
-do
-#mod1
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${fourth}/printk" 0 0 0 0
-    write "${fourth}/panic" 0
-    write "${fourth}/sched_cstate_aware" 0
-    write "${fourth}/sched_energy_aware" 0
-    write "${fourth}/sched_schedstats" 0
-    write "${fourth}/sched_autogroup_enabled" 1
-    write "${fourth}/sched_child_runs_first" 1
-    write "${fourth}/sched_sync_hint_enable" 1
-    write "${fourth}/sched_tunable_scaling" 1
-    log_info "Done." ""
-done
-
-#seventh
-for seventh in /proc/driver/thermal
-do
-#mod2
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${seventh}/tztsAll_enable polling_interval" 0
-    write "${seventh}/tztsAll_enable switch" 1
-    log_info "Done." ""
-done
-
-for eighth in $(find /sys/devices/virtual/thermal/*/* -type f -name "mode")
-do
-#mod3
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${eighth}"
-    write "${eighth}" disabled
-    log_info "Done." ""
-done
-
-#ninth
-for ninth in /proc/gpufreq
-do
-#mod4
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${ninth}/gpufreq_opp_stress_test" 0
-    log_info "Done." ""
-done
-
-for ninth in /proc/cpufreq
-do
-#mod5
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${ninth}/cpufreq_debug" 0
-    write "${ninth}/cpufreq_sched_disable" 0
-    write "${ninth}/cpufreq_stress_test" 0
-    write "${ninth}/cpufreq_power_mode" 3
-    
-    write "${ninth}/cpufreq_dvfs_time_profile" 0 0
-    write "${ninth}/cpufreq_dvfs_time_profile" 1 0
-    write "${ninth}/cpufreq_dvfs_time_profile" 2 0
-    write "${ninth}/cpufreq_dvfs_time_profile" 3 0
-    write "${ninth}/cpufreq_dvfs_time_profile" 4 0
-    write "${ninth}/cpufreq_dvfs_time_profile" 5 0
-    log_info "Done." ""
-done
-
-for ninth in /proc/cpufreq/*/
-do
-#mod6
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${ninth}/cpufreq_turbo_mode" 1
-    log_info "Done." ""
-done
-
-#tenth
-for tenth in /proc/sys/vm
-do
-#mod7
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${tenth}/swappiness" 80
-    log_info "Done." ""
-done
-
-t1() {
-    #eight
-    for eight in /proc/cpufreq
-    do
-    #mod8 big thanks to hoshiyomi kprofile configuration
-        log_info
-        sync # Sync before execute to avoid crashes
-        
-        write "${eight}/cpufreq_imax_thermal_protect "0
-        write "${eight}/cpufreq_cci_mode" 1
-        write "${eight}/cpufreq_imax_enable" 1
-        write "${eight}/cpufreq_sched_disable" 1
-        write "${eight}/cpufreq_power_mode" 3
-        log_info "Done." ""
-    done
-}
-
-t2() {
-    for eight in /proc/irq/240
-    do
-    #mod9 big thanks to hoshiyomi kprofile configuration
-        log_info
-        sync # Sync before execute to avoid crashes
-        
-        write "${eight}/smp_affinity_list" 1
-        log_info "Done." ""
-    done
-}
-
-t3() {
-    for eight in /sys/module/cpuidle/parameters
-    do
-    #mod10 big thanks to hoshiyomi kprofile configuration
-        log_info
-        sync # Sync before execute to avoid crashes
-        
-        write "${eight}/off" 1
-        log_info "Done." ""
-    done
-}
-
-t1
-t2
-t3
-sync # Sync before execute to avoid crashes
-
-#nine
-for nine in /sys/module/ged/parameters
-do
-#mod11 suggested by hoshiyomi
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "${nine}/boost_amp" 1
-    write "${nine}/boost_extra" 1
-    write "${nine}/boost_gpu_enable" 1
-    write "${nine}/cpu_boost_policy" 1
-    write "${nine}/enable_cpu_boost" 1
-    write "${nine}/ged_boost_enable" 1
-    write "${nine}/ged_smart_boost" 1
-    write "${nine}/gpu_dvfs_enable" 1
-    write "${nine}/gx_boost_on" 1
-    write "${nine}/gx_dfps" 1
-    write "${nine}/gx_force_cpu_boost" 1
-    write "${nine}/gx_game_mode" 1
-    write "${nine}/is_GED_KPI_enabled" 1
-    log_info "Done." ""
-done
-
-for logs in $PROC_PATH/ppm_logs
-do
-#logs
-    log_info
-    sync # Sync before execute to avoid crashes
-    
-    write "$PPM_PATH" $logs
-    log_info "Done." ""
-    
-    echo $PPM_PATH >> $logs
-done
 sync # Sync before execute to avoid crashes

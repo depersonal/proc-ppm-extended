@@ -3,12 +3,13 @@
 umask 022
 ui_print() { echo "$1"; }
 
+# Function to check if Magisk version is up to date
 require_new_magisk() {
-  ui_print "*******************************"
-  ui_print " Please install Magisk v20.4+! "
-  ui_print "*******************************"
-  
-  exit 1
+    ui_print "*******************************"
+    ui_print " Please install Magisk v23.0+! "  # Updated to require Magisk v23.0+
+    ui_print "*******************************"
+    
+    exit 1
 }
 
 OUTFD=$2
@@ -16,11 +17,20 @@ ZIPFILE=$3
 
 mount /data 2>/dev/null
 
-[ -f /data/adb/magisk/util_functions.sh ] && {
+# Check if Magisk util_functions.sh exists
+if [ -f /data/adb/magisk/util_functions.sh ]; then
     . /data/adb/magisk/util_functions.sh
     
-    [ $MAGISK_VER_CODE -lt 20400 ] && require_new_magisk
+    # Check if Android version is Android 10 or below
+    ANDROID_VERSION=$(getprop ro.build.version.release)
+    if [ "$ANDROID_VERSION" != "11" ]; then
+        # Check if Magisk version is up to date
+        if [ $MAGISK_VER_CODE -lt 23000 ]; then  # Updated to require Magisk v23.0+
+            require_new_magisk
+        fi
+    fi
+    
     install_module
     
     exit 0
-}
+fi

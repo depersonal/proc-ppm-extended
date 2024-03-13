@@ -1,11 +1,11 @@
-# Enable force 4x msaa by default (it will show up in dev options as disabled, but it is in fact enabled)
+# Enable force 4x MSAA by default (it will appear as disabled in developer options, but it is actually enabled)
 debug.egl.buffcount=4
 debug.egl.force_msaa=true
 
 debug.egl.hw=1
 debug.sf.hw=1
 
-# Set default renderer to Skia (vulkan) cause SystemUI bootloop
+# Set default renderer to Skia but (Vulkan) can cause SystemUI bootloop
 # debug.hwui.renderer=skiavk
 debug.hwui.renderer=skiagl
 ro.hwui.use_skia=true
@@ -14,14 +14,14 @@ ro.hwui.use_vulkan=true
 debug.hwui.render_dirty_regions=false
 hwui.render_dirty_regions=false
 
-# Forces performance mode if devices support it, including Snapdragon devices by general
+# Force performance mode if supported by devices, including Snapdragon devices
 debug.performance.tuning=1
 
 ro.mtk_perf_fast_start_win=1
 ro.mtk_perf_response_time=1
 ro.mtk_perf_simple_start_win=1
 
-# Disable debugging, thanks to @zaidannn7 and his project Disable Unnecessary Things for this part. 
+# Disable debugging, thanks to zaidannn7 and his project. Disable Unnecessary Things for this part.
 debug.atrace.tags.enableflags=0
 debug.mdpcomp.logs=0
 log.tag.stats_log=0
@@ -33,6 +33,7 @@ persist.vendor.verbose_logging_enabled=false
 ro.logd.size.stats=0
 ro.logd.size=0
 
+# Thanks to Konstantin and his project
 # debug.composition.type=gpu
 debug.composition.type=c2d
 debug.enabletr=true
@@ -48,10 +49,14 @@ ro.sf.compbypass.enable=0
 ro.vold.umsdirtyratio=20
 video.accelerate.hw=1
 
-# Anti Vertical Sync (vsync) expands the screen when on.
+# Anti-Vertical Sync (Vsync) expands the screen when enabled.
 debug.egl.swapinterval=0
 debug.gr.swapinterval=0
 hwui.disable_vsync=true
 
 persist.sys.dalvik.hyperthreading=true
 persist.sys.dalvik.multithread=true
+
+# dca084a, 901b871, 2ec6373 by YiHo Cheng, davidchao, Cyan_Hsieh
+persist.vendor.disable.thermal.control=1
+persist.vendor.disable.usb.overheat.mitigation=1

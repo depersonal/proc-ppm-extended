@@ -2,36 +2,47 @@
 
 PROC_PATH="${0%/*}"
 APPROVE="$PROC_PATH/module.prop"
-VERIFY="[-] Misc configuration for /proc/ppm/ kernel profile."
+ACTIVE_STATUS="[+] Module is active"
+INACTIVE_STATUS="[-] Module is inactive"
 
-# DEBUG_LOG="${PROC_PATH}/debug.log"
-
-two() {
-    if [[ -e "$PROC_PATH/disable" ]]
-    then
-        sed -i "/description=/c description=${VERIFY}" $APPROVE
+# Function to confirm module status and update module description accordingly
+s005() {
+    if [[ -e "$PROC_PATH/disable" ]]; then
+        sed -i "/description=/c description=${INACTIVE_STATUS}" "$APPROVE"
+    else
+        sed -i "/description=/c description=${ACTIVE_STATUS}" "$APPROVE"
     fi
-}; two
+}; s005
 
-three() {
-#beginning
-    if [[ -n "$PROC_PATH/root" ]]
-    then
+# Function to execute root script if present before boot (version 1)
+s006() {
+    if [[ -f "$PROC_PATH/root" ]]; then
         sh "${PROC_PATH}/root"
+        # Check if root script has been executed successfully
+        if [[ $? -eq 0 ]]; then
+            echo "Root script executed successfully"
+        else
+            echo "Failed to execute root script"
+            exit 1
+        fi
     else
         exec "${PROC_PATH}/root"
     fi
-}; three
+}; s006
 
-twelfth() {
-    . "${PROC_PATH}/root"
-    
-    log_init
-    log_info "Starting proc_ppm"
-    
-    bootopt_apply
-}; twelfth
+# Function to execute root script and apply boot options (version 2)
+s007() {
+    if [[ -f "$PROC_PATH/root" ]]; then
+        . "${PROC_PATH}/root"
+        log_init
+        log_info "Starting proc_ppm"
+        boot_opt_apply
+    fi
+}; s007
 
-six() {
+# Function to set prop directly (version 3)
+s008() {
     resetprop -v -n --file "${PROC_PATH}/proc.prop"
-}; six
+}; s008
+
+sync # Sync before execution to avoid crashes
