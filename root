@@ -449,16 +449,17 @@ k_bine() {
     
     s037() {
         if [ "$(ls /sys/block/zram0)" ] && {
-            cat /sys/block/zram0/max_comp_streams
-            cat /sys/block/zram0/comp_algorithm
+            file_comp=$(cat /sys/block/zram0/max_comp_streams)
+            file_algorithm=$(cat /sys/block/zram0/comp_algorithm)
             }
+        then
+            echo '1' > $proc_ppm/reset
         fi
         
         for proc_ppm in /sys/block/zram0
         do
-            echo '1' > $proc_ppm/reset
-            echo '3' > $proc_ppm/max_comp_streams
-            echo 'zstd' > $proc_ppm/comp_algorithm
+            echo '$file_comp' > $proc_ppm/max_comp_streams
+            echo '$file_algorithm' > $proc_ppm/comp_algorithm
         done
         
         for proc_ppm in $(find /sys/block/zram*/ -type f -name "mem_limit")
