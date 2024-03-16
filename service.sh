@@ -3,6 +3,8 @@ APPROVE="$PROC_PATH/module.prop"
 VERIFY="[+] Miscellaneous configurations for optimizing the /proc/ppm/ kernel profile."
 INACTIVE_DESC="[-] Module is inactive"
 
+sync # Sync before execution to avoid crashes
+
 # Function to confirm module status and update module description accordingly
 s005() {
     if [[ -e "$PROC_PATH/disable" ]]; then

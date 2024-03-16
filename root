@@ -4,11 +4,20 @@ PROC_PATH="${0%/*}"
 
 PPM_PATH="$(cat /proc/ppm/*/*); $(cat /proc/ppm/*)"
 MODPROC="/data/adb/modules/proc_ppm"
-
 INFO_LOG="${PROC_PATH}/info.log"
 ERROR_LOG="${PROC_PATH}/error.log"
 
 # DEBUG_LOG="${PROC_PATH}/debug.log"
+
+# The name of the current branch for logging purposes
+BRANCH="mods"
+UINT_MAX="4294967295"
+SCHED_PERIOD="$((1 * 1000 * 1000))"
+SCHED_TASKS="10"
+
+# Log the date and time for records sake
+echo "Time of execution: $(date)"
+echo "Branch: $BRANCH"
 
 _del_logging() {
     if [ -f "$PROC_PATH/error.log" ] || [ -f "$PROC_PATH/info.log" ]; then
@@ -240,6 +249,163 @@ kstune() {
     log_info "Done."
 }; kstune
 
+# Sync to data in the rare case a device crashes
+sync
+
+# Limit max perf event processing time to this much CPU usage
+write /proc/sys/kernel/perf_cpu_time_max_percent 3
+
+# Group tasks for less stutter but less throughput
+write /proc/sys/kernel/sched_autogroup_enabled 1
+
+# Execute child process before parent after fork
+write /proc/sys/kernel/sched_child_runs_first 1
+
+# Preliminary requirement for the following values
+write /proc/sys/kernel/sched_tunable_scaling 1
+
+# Reduce the maximum scheduling period for lower latency
+write /proc/sys/kernel/sched_latency_ns "$SCHED_PERIOD"
+
+# Schedule this ratio of tasks in the guarenteed sched period
+write /proc/sys/kernel/sched_min_granularity_ns "$((SCHED_PERIOD / SCHED_TASKS))"
+
+# Require preeptive tasks to surpass half of a sched period in vmruntime
+write /proc/sys/kernel/sched_wakeup_granularity_ns "$((SCHED_PERIOD / 2))"
+
+# Reduce the frequency of task migrations
+write /proc/sys/kernel/sched_migration_cost_ns 5000000
+
+# Always allow sched boosting on top-app tasks
+[[ "$ANDROID" == true ]] && {
+    write /proc/sys/kernel/sched_min_task_util_for_colocation 0
+}
+
+# Improve real time latencies by reducing the scheduler migration time
+write /proc/sys/kernel/sched_nr_migrate 4
+
+# Disable scheduler statistics to reduce overhead
+write /proc/sys/kernel/sched_schedstats 0
+
+# Disable unnecessary printk logging
+write /proc/sys/kernel/printk_devkmsg off
+
+# Start non-blocking writeback later
+write /proc/sys/vm/dirty_background_ratio 15
+
+# Start blocking writeback later
+write /proc/sys/vm/dirty_ratio 25
+
+# Require dirty memory to stay in memory for longer
+write /proc/sys/vm/dirty_expire_centisecs 3000
+
+# Run the dirty memory flusher threads less often
+write /proc/sys/vm/dirty_writeback_centisecs 3000
+
+# Disable read-ahead for swap devices
+write /proc/sys/vm/page-cluster 0
+
+# Update /proc/stat less often to reduce jitter
+write /proc/sys/vm/stat_interval 10
+
+# Swap to the swap device at a fair rate
+write /proc/sys/vm/swappiness 80
+
+# Prioritize page cache over simple file structure nodes
+write /proc/sys/vm/vfs_cache_pressure 200
+
+# Enable Explicit Congestion Control
+write /proc/sys/net/ipv4/tcp_ecn 1
+
+# Enable fast socket open for receiver and sender
+write /proc/sys/net/ipv4/tcp_fastopen 3
+
+# Disable SYN cookies
+write /proc/sys/net/ipv4/tcp_syncookies 0
+
+if [[ -f "/sys/kernel/debug/sched_features" ]]
+then
+    # Consider scheduling tasks that are eager to run
+    write /sys/kernel/debug/sched_features NEXT_BUDDY
+    
+    # Some sources report large latency spikes during large migrations
+    write /sys/kernel/debug/sched_features NO_TTWU_QUEUE
+fi
+
+[[ "$ANDROID" == true ]] && {
+if [[ -d "/dev/stune/" ]]
+then
+    # Prefer to schedule top-app tasks on idle CPUs
+    write /dev/stune/top-app/schedtune.prefer_idle 0
+    
+    # Mark top-app as boosted, find high-performing CPUs
+    write /dev/stune/top-app/schedtune.boost 1
+fi
+}
+
+# Loop over each CPU in the system
+for cpu in /sys/devices/system/cpu/cpu*/cpufreq
+do
+    # Fetch the available governors from the CPU
+    avail_govs="$(cat "$cpu/scaling_available_governors")"
+    
+    # Attempt to set the governor in this order
+    for governor in schedutil interactive ondemand
+    do
+        # Once a matching governor is found, set it and break for this CPU
+        if [[ "$avail_govs" == *"$governor"* ]]
+        then
+            write "$cpu/scaling_governor" "$governor"
+            break
+        fi
+    done
+done
+
+# Apply governor specific tunables for CPUs
+find /sys/devices/system/cpu/ -name schedutil -o -name interactive -o -name ondemand -type d | while IFS= read -r governor
+do
+    # Consider changing frequencies once per scheduling period
+    write "$governor/up_rate_limit_us" 0
+    write "$governor/down_rate_limit_us" 0
+    write "$governor/rate_limit_us" 0
+    write "$governor/timer_rate" 0
+    write "$governor/min_sample_time" 0
+    
+    # Jump to hispeed frequency at this load percentage
+    write "$governor/hispeed_load" 85
+    write "$governor/hispeed_freq" "$UINT_MAX"
+done
+
+for queue in /sys/block/*/queue
+do
+    # Choose the first governor available
+    avail_scheds="$(cat "$queue/scheduler")"
+    for sched in cfq noop kyber bfq mq-deadline none
+    do
+        if [[ "$avail_scheds" == *"$sched"* ]]
+        then
+            write "$queue/scheduler" "$sched"
+            break
+        fi
+    done
+    
+    # Do not use I/O as a source of randomness
+    write "$queue/add_random" 0
+    
+    # Disable I/O statistics accounting
+    write "$queue/iostats" 0
+    
+    # Reduce heuristic read-ahead in exchange for I/O latency
+    write "$queue/read_ahead_kb" 32
+    
+    # Reduce the maximum number of I/O requests in exchange for latency
+    write "$queue/nr_requests" 32
+done
+
+# _unfiltered_function() {
+#     
+# }; _unfiltered_function
+
 k_bine() {
     # suggested by devs
     s029() {
@@ -280,6 +446,36 @@ k_bine() {
             echo '0' > $proc_ppm
         done
     }; s036
+    
+    s037() {
+        if [ "$(ls /sys/block/zram0)" ] && {
+            cat /sys/block/zram0/max_comp_streams
+            cat /sys/block/zram0/comp_algorithm
+            }
+        fi
+        
+        for proc_ppm in /sys/block/zram0
+        do
+            echo '1' > $proc_ppm/reset
+            echo '3' > $proc_ppm/max_comp_streams
+            echo 'zstd' > $proc_ppm/comp_algorithm
+        done
+        
+        for proc_ppm in $(find /sys/block/zram*/ -type f -name "mem_limit")
+        do
+            echo '0' > $proc_ppm
+            echo '$((4096*8192*16384))' > $proc_ppm
+        done
+        
+        for proc_ppm in $(find /sys/block/zram*/ -type f -name "disksize")
+        do
+            echo '4294967296' > $proc_ppm
+            echo '$((4096*8192*16384))' > $proc_ppm
+        done
+        
+        mkswap /dev/block/zram0
+        swapon /dev/block/zram0
+    }; s037
 }; k_bine
 
 s012() {
@@ -434,9 +630,11 @@ k_dule() {
     s027() {
         for proc_ppm in /proc/sys/vm
         do
-            echo '80' > $proc_ppm/swappiness
-            echo '25' > $proc_ppm/dirty_ratio
             echo '15' > $proc_ppm/dirty_background_ratio
+            echo '23500' > $proc_ppm/extra_free_kbytes
+            echo '25' > $proc_ppm/dirty_ratio
+            echo '6022' > $proc_ppm/min_free_kbytes
+            echo '80' > $proc_ppm/swappiness
         done
     }; s027
     

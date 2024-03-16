@@ -1,6 +1,6 @@
 Signature-Version: 1.0
 Created-By: Android Gradle 8.0.2
-SHA1-Digest-Manifest: uIC1puLQzEHfyZw/tZ3ZIC7MkRI=
+SHA1-Digest-Manifest: 8wILBKQuIEVhApkToflCJrJGqhA=
 X-Android-APK-Signed: 2
 
 Name: META-INF/com/google/android/update-binary
@@ -13,19 +13,19 @@ Name: customize.sh
 SHA1-Digest: PIAINWxu2Rt6ev/rgbXN1PR2QMA=
 
 Name: module.prop
-SHA1-Digest: Bm2UE1tgDYnbHuErl+hqhBpQQ7E=
+SHA1-Digest: mYcm9Lj4hY6RpDArHD2CNIOiY8Q=
 
 Name: post-fs-data.sh
 SHA1-Digest: evW1ajkKe0mQHFYyIEjeHrd3VCo=
 
 Name: proc.prop
-SHA1-Digest: DugKqgCOtR92NUFy7xQdkRk2Yvo=
+SHA1-Digest: c2zs8xkGvroHLuUCqfADTGpRq0Q=
 
 Name: root
-SHA1-Digest: q9aNyJrenpH7Uh5rImmkz+BmVZA=
+SHA1-Digest: 8susVYwC8/SQK7A/vyiRcfyMGGo=
 
 Name: service.sh
-SHA1-Digest: ccXViWRz8sHQoOFmPA1ontI02Xc=
+SHA1-Digest: YgYktO7W/CgpZ4APbytsM1Iakmo=
 
 Name: uninstall.sh
 SHA1-Digest: tRBQq0pOEFMBc0rx8nOYjS7pcso=
