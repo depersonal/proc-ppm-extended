@@ -406,6 +406,31 @@ done
 #     
 # }; _unfiltered_function
 
+over_clock0() {
+    max_freq=$(cat /sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq)
+    
+    for proc_ppm in $(find /sys/devices/system/cpu/cpu*/cpufreq/ -type f -name "cpuinfo_min_freq")
+    do
+        echo $max_freq > $proc_ppm
+    done
+}; over_clock0
+
+over_clock1() {
+    max_freq=$(cat /sys/devices/system/cpu/cpufreq/policy*/cpuinfo_max_freq)
+    
+    for proc_ppm in $(find /sys/devices/system/cpu/cpufreq/policy*/ -type f -name "cpuinfo_min_freq")
+    do
+        echo $max_freq > $proc_ppm
+    done
+}; over_clock1
+
+over_clock2() {
+    for proc_ppm in $(find /sys/devices/system/cpu/perf/ -type f -name "enable")
+    do
+        echo '1' > $proc_ppm
+    done
+}; over_clock2
+
 k_bine() {
     # suggested by devs
     s029() {
