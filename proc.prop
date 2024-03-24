@@ -72,4 +72,11 @@ profiler.force_disable_ulog=1
 ro.config.nocheckin=1
 ro.kernel.android.checkjni=0
 ro.kernel.checkjni=0
-vm.stat_interval=1
+vm.stat_interval=10
+
+debug.sf.latch_unsignaled=0
+vendor.debug.sf.latch_unsignaled=0
+
+# Mediatek thermal both and other v2
+vendor.thermal.manager.is_ht120=1
+# vendor.thermal.manager.is_ht120=0

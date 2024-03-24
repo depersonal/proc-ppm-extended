@@ -1,6 +1,6 @@
 id=proc_ppm
 name=Proc ppm
-version=v2.6-0.0.2.6
-versionCode=0000206
-author=7secc, Konstantin, Hoshiyomi
+version=v3.3-0.0.3.3
+versionCode=0000303
+author=7secc, Konstantin, Hoshiyomi, Blanco
 description=Miscellaneous configurations for optimizing the /proc/ppm/ kernel profile.

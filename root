@@ -20,8 +20,12 @@ echo "Time of execution: $(date)"
 echo "Branch: $BRANCH"
 
 _del_logging() {
-    if [ -f "$PROC_PATH/error.log" ] || [ -f "$PROC_PATH/info.log" ]; then
-        if [ -f "$MODPROC/proc_ppm" ]; then
+    if [[ -f "$PROC_PATH/error.log" ]] && {
+        [[ -f "$PROC_PATH/info.log" ]]
+    }
+    then
+        if [[ -f "$MODPROC/proc_ppm" ]]
+        then
             rm -rf "$PROC_PATH/error.log" \
                 "$PROC_PATH/info.log" \
                 "$MODPROC/ppm_logs"
@@ -38,7 +42,7 @@ log_init() {
 _log_proc() {
     local log=$1
     shift
-    while [ "$#" -gt 0 ]
+    while [[ "$#" -gt 0 ]]
     do
         local message="$1"
         echo "[$(date "+%H:%M:%S")] $message" >> "$log"
@@ -62,7 +66,7 @@ write() {
     local file="$1"
     local value="$2"
     
-    [ -f "$file" ] || {
+    [[ -f "$file" ]] || {
         log_error "Error: File $file does not exist."
         return 1
     }
@@ -87,18 +91,18 @@ boot_opt_apply() {
     sync # Sinkronisasi sebelum eksekusi untuk menghindari kehilangan data
     
     # Mengoptimalkan read_ahead_kb dan nr_requests
-    for proc_ppm in $(find /sys/block/*/queue/* -type f -name "read_ahead_kb" -o -name "nr_requests")
+    for proc_ppm in /sys/block/*/queue
     do
-        [ -f "$proc_ppm" ] && {
-            write "${proc_ppm}" 2048 || log_error "Failed to write to $proc_ppm"
-            write "${proc_ppm}" 512 || log_error "Failed to write to $proc_ppm"
+        [[ -f "$proc_ppm" ]] && {
+            write "$proc_ppm/nr_requests" 2048 || log_error "Failed to write to $proc_ppm"
+            write "$proc_ppm/read_ahead_kb" 512 || log_error "Failed to write to $proc_ppm"
         }
     done
     
     # Menonaktifkan clkgate_enable, clkscale_enable, dan hibern8_on_idle_enable
     for proc_ppm in $(find /sys/devices/platform/*/*/* -type f -name "clkgate_enable" -o -name "clkscale_enable" -o -name "hibern8_on_idle_enable")
     do
-        [ -f "$proc_ppm" ] && {
+        [[ -f "$proc_ppm" ]] && {
             write "$proc_ppm" 0 || log_error "Failed to write to $proc_ppm"
         }
     done
@@ -114,17 +118,17 @@ boot_opt_reset() {
     # Mengaktifkan kembali clkgate_enable, clkscale_enable, dan hibern8_on_idle_enable
     for proc_ppm in $(find /sys/devices/platform/*/*/* -type f -name "clkgate_enable" -o -name "clkscale_enable" -o -name "hibern8_on_idle_enable")
     do
-        [ -f "$proc_ppm" ] && {
+        [[ -f "$proc_ppm" ]] && {
             write "$proc_ppm" 1 || log_error "Failed to write to $proc_ppm"
         }
     done
     
     # Mengatur kembali nilai read_ahead_kb dan nr_requests ke nilai default
-    for proc_ppm in $(find /sys/block/*/queue/* -type f -name "read_ahead_kb" -o -name "nr_requests")
+    for proc_ppm in /sys/block/*/queue
     do
-        [ -f "$proc_ppm" ] && {
-            write "${proc_ppm}" 128 || log_error "Failed to write to $proc_ppm"
-            write "${proc_ppm}" 64 || log_error "Failed to write to $proc_ppm"
+        [[ -f "$proc_ppm" ]] && {
+            write "$proc_ppm/nr_requests" 128 || log_error "Failed to write to $proc_ppm"
+            write "$proc_ppm/read_ahead_kb" 64 || log_error "Failed to write to $proc_ppm"
         }
     done
     
@@ -140,18 +144,20 @@ anti_debugging() {
     for proc_ppm in $(find /sys/block/*/queue/* -type f -name "iostats") \
         $(find /sys/module/*/parameters/* -type f -name "debug_mask" -o -name "debug_level")
     do
-        [ -f "$proc_ppm" ] && {
+        [[ -f "$proc_ppm" ]] && {
             write "$proc_ppm" 0 || log_error "Failed to write to $proc_ppm"
         }
     done
     
     # Menghentikan servis logd jika sedang berjalan
-    if [ "$(getprop init.svc.logd)" = running ]; then
+    if [[ "$(getprop init.svc.logd)" = running ]]
+    then
         stop logd || log_error "Failed to stop logd service"
     fi
     
     # Menghentikan servis statsd jika sedang berjalan
-    if [ "$(getprop init.svc.statsd)" = running ]; then
+    if [[ "$(getprop init.svc.statsd)" = running ]]
+    then
         stop statsd || log_error "Failed to stop statsd service"
     fi
     
@@ -164,8 +170,8 @@ anti_debugging() {
         /sys/module/{debug/parameters/enable_event_log,ext4/parameters/mballoc_debug,mali/parameters/mali_debug_level,mmc_core/parameters/use_spi_crc,msm_show_resume_irq/parameters/debug_mask,rmnet_data/parameters/rmnet_data_log_level,rpm_smd/parameters/debug_mask,subsystem_restart/parameters/enable_ramdumps} \
         /sys/module/{logd,logger}/parameters/enabled
     do
-        [ -f "$proc_ppm" ] && {
-            write "$proc_ppm" 0 || log_error "Failed to write to $proc_ppm"
+        [[ -f "$proc_ppm" ]] && {
+            write "${proc_ppm}" 0 || log_error "Failed to write to $proc_ppm"
         }
     done
     
@@ -238,81 +244,94 @@ kstune() {
     value_prefer_idle2="0"
     
     # Menulis nilai ke setiap file
-    write "$value_boost" "$file_boost"
-    write "$value_prefer_idle1" "$file_prefer_idle1"
-    write "$value_prefer_idle2" "$file_prefer_idle2"
+    write "$value_boost" "$file_boost" || log_error "Failed to write to $file_boost"
+    write "$value_prefer_idle1" "$file_prefer_idle1" || log_error "Failed to write to $file_prefer_idle1"
+    write "$value_prefer_idle2" "$file_prefer_idle2" || log_error "Failed to write to $file_prefer_idle2"
     
     # Komentar: Menulis nilai ke setiap file cpuset
     # write /dev/cpuset/background/cpus '0-3'
     # write /dev/cpuset/foreground/cpus '0-7'
     
-    log_info "Done."
+    log_info "Done." ""
 }; kstune
 
 # Sync to data in the rare case a device crashes
 sync
 
-# Limit max perf event processing time to this much CPU usage
-write /proc/sys/kernel/perf_cpu_time_max_percent 3
+ppm_mods_s004() {
+    for proc_ppm in /proc/sys/kernel
+    do
+        # Limit max perf event processing time to this much CPU usage
+        write $proc_ppm/perf_cpu_time_max_percent 3
+        
+        # Group tasks for less stutter but less throughput
+        write $proc_ppm/sched_autogroup_enabled 1
+        
+        # Execute child process before parent after fork
+        write $proc_ppm/sched_child_runs_first 1
+        
+        # Preliminary requirement for the following values
+        write $proc_ppm/sched_tunable_scaling 1
+        
+        # Reduce the maximum scheduling period for lower latency
+        write $proc_ppm/sched_latency_ns "$SCHED_PERIOD"
+        
+        # Schedule this ratio of tasks in the guarenteed sched period
+        write $proc_ppm/sched_min_granularity_ns "$((SCHED_PERIOD / SCHED_TASKS))"
+        
+        # Require preeptive tasks to surpass half of a sched period in vmruntime
+        write $proc_ppm/sched_wakeup_granularity_ns "$((SCHED_PERIOD / 2))"
+        
+        # Reduce the frequency of task migrations
+        write $proc_ppm/sched_migration_cost_ns 5000000
+        
+        # Always allow sched boosting on top-app tasks
+        [[ "$ANDROID" == true ]] && {
+            write $proc_ppm/sched_min_task_util_for_colocation 0
+        }
+        
+        # Improve real time latencies by reducing the scheduler migration time
+        write $proc_ppm/sched_nr_migrate 4
+        
+        # Disable scheduler statistics to reduce overhead
+        write $proc_ppm/sched_schedstats 0
+        
+        # Disable unnecessary printk logging
+        write $proc_ppm/printk_devkmsg off
+        
+        # Improve entropy schedulers
+        write $proc_ppm/random/write_wakeup_threshold 4096
+    done
+}; ppm_mods_s004
 
-# Group tasks for less stutter but less throughput
-write /proc/sys/kernel/sched_autogroup_enabled 1
-
-# Execute child process before parent after fork
-write /proc/sys/kernel/sched_child_runs_first 1
-
-# Preliminary requirement for the following values
-write /proc/sys/kernel/sched_tunable_scaling 1
-
-# Reduce the maximum scheduling period for lower latency
-write /proc/sys/kernel/sched_latency_ns "$SCHED_PERIOD"
-
-# Schedule this ratio of tasks in the guarenteed sched period
-write /proc/sys/kernel/sched_min_granularity_ns "$((SCHED_PERIOD / SCHED_TASKS))"
-
-# Require preeptive tasks to surpass half of a sched period in vmruntime
-write /proc/sys/kernel/sched_wakeup_granularity_ns "$((SCHED_PERIOD / 2))"
-
-# Reduce the frequency of task migrations
-write /proc/sys/kernel/sched_migration_cost_ns 5000000
-
-# Always allow sched boosting on top-app tasks
-[[ "$ANDROID" == true ]] && {
-    write /proc/sys/kernel/sched_min_task_util_for_colocation 0
-}
-
-# Improve real time latencies by reducing the scheduler migration time
-write /proc/sys/kernel/sched_nr_migrate 4
-
-# Disable scheduler statistics to reduce overhead
-write /proc/sys/kernel/sched_schedstats 0
-
-# Disable unnecessary printk logging
-write /proc/sys/kernel/printk_devkmsg off
-
-# Start non-blocking writeback later
-write /proc/sys/vm/dirty_background_ratio 15
-
-# Start blocking writeback later
-write /proc/sys/vm/dirty_ratio 25
-
-# Require dirty memory to stay in memory for longer
-write /proc/sys/vm/dirty_expire_centisecs 3000
-
-# Run the dirty memory flusher threads less often
-write /proc/sys/vm/dirty_writeback_centisecs 3000
-
-# Disable read-ahead for swap devices
-write /proc/sys/vm/page-cluster 0
-
-# Update /proc/stat less often to reduce jitter
-write /proc/sys/vm/stat_interval 10
-
-# Swap to the swap device at a fair rate
-write /proc/sys/vm/swappiness 80
-
-# Prioritize page cache over simple file structure nodes
-write /proc/sys/vm/vfs_cache_pressure 200
+ppm_mods_s003() {
+    for proc_ppm in /proc/sys/vm
+    do
+        # Start non-blocking writeback later
+        write $proc_ppm/dirty_background_ratio 5
+        
+        # Start blocking writeback later
+        write $proc_ppm/dirty_ratio 30
+        
+        # Require dirty memory to stay in memory for longer
+        write $proc_ppm/dirty_expire_centisecs 3000
+        
+        # Run the dirty memory flusher threads less often
+        write $proc_ppm/dirty_writeback_centisecs 3000
+        
+        # Disable read-ahead for swap devices
+        write $proc_ppm/page-cluster 0
+        
+        # Update /proc/stat less often to reduce jitter
+        write $proc_ppm/stat_interval 10
+        
+        # Swap to the swap device at a fair rate
+        write $proc_ppm/swappiness 80
+        
+        # Prioritize page cache over simple file structure nodes
+        write $proc_ppm/vfs_cache_pressure 200
+    done
+}; ppm_mods_s003
 
 # Enable Explicit Congestion Control
 write /proc/sys/net/ipv4/tcp_ecn 1
@@ -333,73 +352,73 @@ then
 fi
 
 [[ "$ANDROID" == true ]] && {
-if [[ -d "/dev/stune/" ]]
-then
-    # Prefer to schedule top-app tasks on idle CPUs
-    write /dev/stune/top-app/schedtune.prefer_idle 0
-    
-    # Mark top-app as boosted, find high-performing CPUs
-    write /dev/stune/top-app/schedtune.boost 1
-fi
+    if [[ -d "/dev/stune/" ]]
+    then
+        # Prefer to schedule top-app tasks on idle CPUs
+        write /dev/stune/top-app/schedtune.prefer_idle 0
+        
+        # Mark top-app as boosted, find high-performing CPUs
+        write /dev/stune/top-app/schedtune.boost 1
+    fi
 }
 
 # Loop over each CPU in the system
-for cpu in /sys/devices/system/cpu/cpu*/cpufreq
+for ppm_cpu in /sys/devices/system/cpu/cpu*/cpufreq
 do
     # Fetch the available governors from the CPU
-    avail_govs="$(cat "$cpu/scaling_available_governors")"
+    avail_govs=$(cat $ppm_cpu/scaling_available_governors)
     
     # Attempt to set the governor in this order
-    for governor in schedutil interactive ondemand
+    for ppm_governor in schedutil interactive ondemand
     do
         # Once a matching governor is found, set it and break for this CPU
-        if [[ "$avail_govs" == *"$governor"* ]]
+        if [[ "$avail_govs" == *"$ppm_governor"* ]]
         then
-            write "$cpu/scaling_governor" "$governor"
+            write "$ppm_cpu/scaling_governor" "$ppm_governor"
             break
         fi
     done
 done
 
 # Apply governor specific tunables for CPUs
-find /sys/devices/system/cpu/ -name schedutil -o -name interactive -o -name ondemand -type d | while IFS= read -r governor
+find /sys/devices/system/cpu/ -name "schedutil" -o -name "interactive" -o -name "ondemand" -type d | while IFS= read -r ppm_governor
 do
     # Consider changing frequencies once per scheduling period
-    write "$governor/up_rate_limit_us" 0
-    write "$governor/down_rate_limit_us" 0
-    write "$governor/rate_limit_us" 0
-    write "$governor/timer_rate" 0
-    write "$governor/min_sample_time" 0
+    write "$ppm_governor/up_rate_limit_us" 0
+    write "$ppm_governor/down_rate_limit_us" 0
+    write "$ppm_governor/rate_limit_us" 0
+    write "$ppm_governor/timer_rate" 0
+    write "$ppm_governor/min_sample_time" 0
     
     # Jump to hispeed frequency at this load percentage
-    write "$governor/hispeed_load" 85
-    write "$governor/hispeed_freq" "$UINT_MAX"
+    write "$ppm_governor/hispeed_load" 85
+    write "$ppm_governor/hispeed_freq" "$UINT_MAX"
 done
 
-for queue in /sys/block/*/queue
+for ppm_queue in /sys/block/*/queue
 do
     # Choose the first governor available
-    avail_scheds="$(cat "$queue/scheduler")"
-    for sched in cfq noop kyber bfq mq-deadline none
+    avail_scheds="$(cat "$ppm_queue/scheduler")"
+    for ppm_sched in cfq noop kyber bfq mq-deadline none
     do
-        if [[ "$avail_scheds" == *"$sched"* ]]
+        if [[ "$avail_scheds" == *"$ppm_sched"* ]]
         then
-            write "$queue/scheduler" "$sched"
+            write "$ppm_queue/scheduler" "$ppm_sched"
             break
         fi
     done
     
     # Do not use I/O as a source of randomness
-    write "$queue/add_random" 0
+    write "$ppm_queue/add_random" 0
     
     # Disable I/O statistics accounting
-    write "$queue/iostats" 0
+    write "$ppm_queue/iostats" 0
     
     # Reduce heuristic read-ahead in exchange for I/O latency
-    write "$queue/read_ahead_kb" 32
+    write "$ppm_queue/read_ahead_kb" 32
     
     # Reduce the maximum number of I/O requests in exchange for latency
-    write "$queue/nr_requests" 32
+    write "$ppm_queue/nr_requests" 128
 done
 
 # _unfiltered_function() {
@@ -411,7 +430,7 @@ over_clock0() {
     
     for proc_ppm in $(find /sys/devices/system/cpu/cpu*/cpufreq/ -type f -name "cpuinfo_min_freq")
     do
-        echo $max_freq > $proc_ppm
+        echo '$max_freq' > $proc_ppm
     done
 }; over_clock0
 
@@ -420,7 +439,7 @@ over_clock1() {
     
     for proc_ppm in $(find /sys/devices/system/cpu/cpufreq/policy*/ -type f -name "cpuinfo_min_freq")
     do
-        echo $max_freq > $proc_ppm
+        echo '$max_freq' > $proc_ppm
     done
 }; over_clock1
 
@@ -431,7 +450,7 @@ over_clock2() {
     done
 }; over_clock2
 
-k_bine() {
+ppm_mods_s002() {
     # suggested by devs
     s029() {
         for proc_ppm in /proc/cpufreq
@@ -445,9 +464,9 @@ k_bine() {
     }; s029
     
     s030() {
-        for proc_ppm in /proc/irq/240
+        for proc_ppm in $(find /proc/irq/240/ -type f -name "smp_affinity_list")
         do
-            echo '1' > $proc_ppm/smp_affinity_list
+            echo '1' > $proc_ppm
         done
     }; s030
     
@@ -473,15 +492,20 @@ k_bine() {
     }; s036
     
     s037() {
-        if [ "$(ls /sys/block/zram0)" ] && {
-            file_comp=$(cat /sys/block/zram0/max_comp_streams)
-            file_algorithm=$(cat /sys/block/zram0/comp_algorithm)
-            }
+        if [[ "$(ls /sys/block/zram*)" ]] && {
+            file_comp=$(cat /sys/block/zram*/max_comp_streams)
+            file_algorithm=$(cat /sys/block/zram*/comp_algorithm)
+            file_limit=$(cat /sys/block/zram*/mem_limit)
+            file_disksize=$(cat /sys/block/zram*/disksize)
+        }
         then
-            echo '1' > $proc_ppm/reset
+            for proc_ppm in $(find /sys/block/zram*/ -type f -name "reset")
+            do
+                echo '1' > $proc_ppm
+            done
         fi
         
-        for proc_ppm in /sys/block/zram0
+        for proc_ppm in /sys/block/zram*
         do
             echo '$file_comp' > $proc_ppm/max_comp_streams
             echo '$file_algorithm' > $proc_ppm/comp_algorithm
@@ -489,28 +513,27 @@ k_bine() {
         
         for proc_ppm in $(find /sys/block/zram*/ -type f -name "mem_limit")
         do
-            echo '0' > $proc_ppm
-            echo '$((4096*8192*16384))' > $proc_ppm
+            echo '$file_limit' > $proc_ppm
         done
         
         for proc_ppm in $(find /sys/block/zram*/ -type f -name "disksize")
         do
-            echo '4294967296' > $proc_ppm
-            echo '$((4096*8192*16384))' > $proc_ppm
+            echo '$file_disksize' > $proc_ppm
         done
         
         mkswap /dev/block/zram0
         swapon /dev/block/zram0
     }; s037
-}; k_bine
+}; ppm_mods_s002
 
 s012() {
 # make sure v1
     if [[ "$(id -u)" -ne 0 ]]
     then
-        for logs in $PROC_PATH/ppm_logs
+        for logger in $PROC_PATH/ppm_logs
         do
-    	    echo "No root detected. proc_ppm exited." > $logs
+        # logger error only
+    	    echo "No root detected. proc_ppm exited." > $logger
     	done
     	
     	exit 1
@@ -521,7 +544,7 @@ grep -q android /proc/cmdline && {
     ANDROID=true
 }
 
-k_dule() {
+ppm_mods_s001() {
     s013() {
     # make sure v2
         if [[ "$(getprop sys.boot_completed)" -ne 1 ]] && {
@@ -545,52 +568,61 @@ k_dule() {
     }; s014
     
     s015() {
-        for proc_ppm in /proc/ppm/profile
+        for proc_ppm in $(find /proc/ppm/profile/ -type f -name "profile_on")
         do
-            echo '1' > $proc_ppm/profile_on
+            echo '1' > $proc_ppm
         done
     }; s015
     
     s016() {
-        for proc_ppm in /proc/ppm; do
-            for status in $(seq 0 9); do
-                if [ "$status" -eq 8 ]; then
-                    echo "$status 1" > "$proc_ppm/policy_status"
+        for proc_ppm in /proc/ppm
+        do
+            for ppm_status in $(seq 0 9)
+            do
+                if [[ "$ppm_status" -eq 8 ]]
+                then
+                    echo "$ppm_status 1" > "$proc_ppm/policy_status"
                 else
-                    echo "$status 0" > "$proc_ppm/policy_status"
+                    echo "$ppm_status 0" > "$proc_ppm/policy_status"
                 fi
             done
         done
     }; s016
     
     s017() {
-        for proc_ppm in /proc/ppm/policy; do
-            for freq in $(seq 0 7); do
-                echo "$freq 0" > "$proc_ppm/sysboost_freq"
+        for proc_ppm in /proc/ppm/policy
+        do
+            for ppm_freq in $(seq 0 7)
+            do
+                echo "$ppm_freq 0" > "$proc_ppm/sysboost_freq"
             done
         done
     }; s017
     
     s018() {
-        for proc_ppm in /proc/ppm/policy; do
-            for limit in $(seq 0 7); do
-                echo "$limit 0" > "$proc_ppm/sysboost_cluster_freq_limit"
+        for proc_ppm in /proc/ppm/policy
+        do
+            for ppm_limit in $(seq 0 7)
+            do
+                echo "$ppm_limit 0" > "$proc_ppm/sysboost_cluster_freq_limit"
             done
         done
     }; s018
     
     s019() {
-        for proc_ppm in /proc/ppm/policy; do
-            for limit in $(seq 0 7); do
-                echo "$limit 0" > "$proc_ppm/sysboost_cluster_freqidx_limit"
+        for proc_ppm in /proc/ppm/policy
+        do
+            for ppm_cluster in $(seq 0 7)
+            do
+                echo "$ppm_cluster 0" > "$proc_ppm/sysboost_cluster_freqidx_limit"
             done
         done
     }; s019
     
     s020() {
-        for proc_ppm in /proc/ppm/policy
+        for proc_ppm in $(find /proc/ppm/policy/ -type f -name "thermal_limit")
         do
-            echo '0' > $proc_ppm/thermal_limit
+            echo '0' > $proc_ppm
         done
     }; s020
     
@@ -612,8 +644,8 @@ k_dule() {
     s022() {
         for proc_ppm in /proc/driver/thermal
         do
-            echo polling_interval 0 > $proc_ppm/tztsAll_enable
-            echo switch 1 > $proc_ppm/tztsAll_enable
+            echo 'polling_interval 0' > $proc_ppm/tztsAll_enable
+            echo 'switch 1' > $proc_ppm/tztsAll_enable
         done
     }; s022
     
@@ -625,9 +657,9 @@ k_dule() {
     }; s023
     
     s024() {
-        for proc_ppm in /proc/gpufreq
+        for proc_ppm in $(find /proc/gpufreq/ -type f -name "gpufreq_opp_stress_test")
         do
-            echo '0' > $proc_ppm/gpufreq_opp_stress_test
+            echo '0' > $proc_ppm
         done
     }; s024
     
@@ -639,27 +671,39 @@ k_dule() {
             echo '0' > $proc_ppm/cpufreq_stress_test
             echo '3' > $proc_ppm/cpufreq_power_mode
             
-            for profile in {0..5}
+            for ppm_profile in {0..5}
             do
-                echo "$profile 0" > $proc_ppm/cpufreq_dvfs_time_profile
+                echo "$ppm_profile 0" > $proc_ppm/cpufreq_dvfs_time_profile
             done
         done
     }; s025
     
     s026() {
-        for proc_ppm in /proc/cpufreq/*/
+        for proc_ppm in $(find /proc/cpufreq/*/ -type f -name "cpufreq_turbo_mode")
         do
-            echo '1' > $proc_ppm/cpufreq_turbo_mode
+            echo '1' > $proc_ppm
         done
     }; s026
     
     s027() {
+        if [[ "$(ls /sys/block/zram*)" ]] && {
+            file_min=$(cat /sys/block/zram*/min_free_kbytes)
+            file_extra=$(cat /sys/block/zram*/extra_free_kbytes)
+        }
+        then
+            for proc_ppm in $(find /sys/block/zram*/ -type f -name "reset")
+            do
+                echo '1' > $proc_ppm/
+            done
+        fi
+        
         for proc_ppm in /proc/sys/vm
         do
-            echo '15' > $proc_ppm/dirty_background_ratio
-            echo '23500' > $proc_ppm/extra_free_kbytes
-            echo '25' > $proc_ppm/dirty_ratio
-            echo '6022' > $proc_ppm/min_free_kbytes
+            echo '$file_extra' > $proc_ppm/extra_free_kbytes
+            echo '$file_min' > $proc_ppm/min_free_kbytes
+            
+            echo '30' > $proc_ppm/dirty_ratio
+            echo '5' > $proc_ppm/dirty_background_ratio
             echo '80' > $proc_ppm/swappiness
         done
     }; s027
@@ -670,11 +714,249 @@ k_dule() {
             echo 'disable' > $proc_ppm
         done
     }; s028
-}; k_dule
+}; ppm_mods_s001
+
+ppm_mods_s000() {
+    s038() {
+        for proc_ppm in /dev/stune/background
+        do
+            echo '0' > $proc_ppm/schedtune.prefer_idle
+            echo '0.00' > $proc_ppm/schedtune.uclamp.min
+            echo '1' > $proc_ppm/schedtune.boost
+            echo 'max' > $proc_ppm/schedtune.uclamp.max
+        done
+    }; s038
+    
+    s039() {
+        for proc_ppm in /dev/stune/camera-daemon
+        do
+            echo '0' > $proc_ppm/schedtune.prefer_idle
+            echo '0.00' > $proc_ppm/schedtune.uclamp.min
+            echo '1' > $proc_ppm/schedtune.boost
+            echo 'max' > $proc_ppm/schedtune.uclamp.max
+        done
+    }; s039
+    
+    s040() {
+        for proc_ppm in /dev/stune/foreground
+        do
+            echo '0' > $proc_ppm/schedtune.prefer_idle
+            echo '0.00' > $proc_ppm/schedtune.uclamp.min
+            echo '1' > $proc_ppm/schedtune.boost
+            echo 'max' > $proc_ppm/schedtune.uclamp.max
+        done
+    }; s040
+    
+    s041() {
+        for proc_ppm in /dev/stune/rt
+        do
+            echo '0' > $proc_ppm/schedtune.prefer_idle
+            echo '0.00' > $proc_ppm/schedtune.uclamp.min
+            echo '1' > $proc_ppm/schedtune.boost
+            echo 'max' > $proc_ppm/schedtune.uclamp.max
+        done
+    }; s041
+    
+    s042() {
+        for proc_ppm in /dev/stune
+        do
+            echo '0' > $proc_ppm/schedtune.prefer_idle
+            echo '1' > $proc_ppm/schedtune.boost
+        done
+    }; s042
+    
+    s043() {
+        for proc_ppm in /dev/stune/top-app
+        do
+            echo '0' > $proc_ppm/schedtune.prefer_idle
+            echo '1' > $proc_ppm/schedtune.boost
+            echo 'max' > $proc_ppm/schedtune.uclamp.max
+            echo 'max' > $proc_ppm/schedtune.uclamp.min
+        done
+    }; s043
+    
+    s044() {
+        for proc_ppm in $(find /proc/sys/kernel/random/ -type f -name "write_wakeup_threshold")
+        do
+            echo '4094' > $proc_ppm
+        done
+    }; s044
+    
+    s045() {
+        for proc_ppm in /proc/sys/kernel
+        do
+            echo '0' > $proc_ppm/sched_cstate_aware
+            echo '0' > $proc_ppm/sched_energy_aware
+            echo '0' > $proc_ppm/sched_schedstats
+            echo '1' > $proc_ppm/sched_autogroup_enabled
+            echo '1' > $proc_ppm/sched_child_runs_first
+            echo '1' > $proc_ppm/sched_sync_hint_enable
+            echo '1' > $proc_ppm/sched_tunable_scaling
+            echo '100000' > $proc_ppm/sched_min_granularity_ns
+            echo '1000000' > $proc_ppm/sched_latency_ns
+            echo '1000000' > $proc_ppm/sched_rt_period_us
+            echo '1024' > $proc_ppm/sched_util_clamp_max
+            echo '1024' > $proc_ppm/sched_util_clamp_min
+            echo '4' > $proc_ppm/sched_nr_migrate
+            echo '500000' > $proc_ppm/sched_wakeup_granularity_ns
+            echo '5000000' > $proc_ppm/sched_migration_cost_ns
+            echo '90' > $proc_ppm/sched_rr_timeslice_ms
+            echo '950000' > $proc_ppm/sched_rt_runtime_us
+        done
+    }; s045
+    
+    s046() {
+        for proc_ppm in $(find /proc/sys/net/ipv4/ -type f -name "tcp_congestion_control")
+        do
+            echo 'bic' > $proc_ppm
+        done
+    }; s046
+    
+    s047() {
+        if [[ "$(ls /sys/block/zram*)" ]] && {
+            file_min=$(cat /sys/block/zram*/min_free_kbytes)
+            file_extra=$(cat /sys/block/zram*/extra_free_kbytes)
+        }
+        then
+            for proc_ppm in /sys/block/zram*
+            do
+                echo '1' > $proc_ppm/reset
+            done
+        fi
+        
+        for proc_ppm in /proc/sys/vm
+        do
+            echo '$file_extra' > $proc_ppm/extra_free_kbytes
+            echo '$file_min' > $proc_ppm/min_free_kbytes
+            
+            echo '0' > $proc_ppm/laptop_mode
+            echo '0' > $proc_ppm/oom_kill_allocating_task
+            echo '200' > $proc_ppm/vfs_cache_pressure
+            echo '30' > $proc_ppm/dirty_ratio
+            echo '3000' > $proc_ppm/dirty_expire_centisecs
+            echo '3000' > $proc_ppm/dirty_writeback_centisecs
+            echo '5' > $proc_ppm/dirty_background_ratio
+            echo '50' > $proc_ppm/overcommit_ratio
+            echo '80' > $proc_ppm/swappiness
+        done
+    }; s047
+    
+    s048() {
+        scheduler=$(cat /sys/block/dm-*/queue/scheduler)
+        
+        for proc_ppm in /sys/block/dm-*/queue
+        do
+            echo '$scheduler' > $proc_ppm/scheduler
+            
+            echo '0' > $proc_ppm/add_random
+            echo '0' > $proc_ppm/iostats
+            echo '0' > $proc_ppm/nomerges
+            echo '0' > $proc_ppm/rotational
+            echo '0' > $proc_ppm/rq_affinity
+            echo '128' > $proc_ppm/nr_requests
+            echo '32' > $proc_ppm/read_ahead_kb
+        done
+    }; s048
+    
+    s049() {
+        scheduler=$(cat /sys/block/mmcblk*/queue/scheduler)
+        
+        for proc_ppm in /sys/block/mmcblk*/queue
+        do
+            echo '$scheduler' > $proc_ppm/scheduler
+            
+            echo '0' > $proc_ppm/add_random
+            echo '0' > $proc_ppm/iostats
+            echo '0' > $proc_ppm/nomerges
+            echo '0' > $proc_ppm/rotational
+            echo '0' > $proc_ppm/rq_affinity
+            echo '128' > $proc_ppm/nr_requests
+            echo '32' > $proc_ppm/read_ahead_kb
+        done
+    }; s049
+    
+    s050() {
+        scheduler=$(cat /sys/block/mmcblk*/queue/scheduler)
+        
+        for proc_ppm in /sys/block/mmcblk*/queue
+        do
+            echo '$scheduler' > $proc_ppm/scheduler
+            
+            echo '0' > $proc_ppm/add_random
+            echo '0' > $proc_ppm/iostats
+            echo '0' > $proc_ppm/nomerges
+            echo '0' > $proc_ppm/rotational
+            echo '0' > $proc_ppm/rq_affinity
+            echo '128' > $proc_ppm/nr_requests
+            echo '32' > $proc_ppm/read_ahead_kb
+        done
+    }; s050
+    
+    s051() {
+        for proc_ppm in /sys/block/*/queue/iosched
+        do
+            echo '2000000' > $proc_ppm/read_lat_nsec
+            echo '10000000' > $proc_ppm/write_lat_nsec
+        done
+    }; s051
+    
+    s052() {
+        if [[ "$(ls /sys/block/zram*)" ]] && {
+            file_comp=$(cat /sys/block/zram*/max_comp_streams)
+            file_disksize=$(cat /sys/block/zram*/disksize)
+        }
+        then
+            for proc_ppm in $(find /sys/block/zram*/ -type f -name "initstate")
+            do
+                echo '1' > $proc_ppm
+            done
+        fi
+        
+        for proc_ppm in /sys/block/zram*
+        do
+            echo '$file_comp' > $proc_ppm/comp_algorithm
+            echo '$file_disksize' > $proc_ppm/disksize
+        done
+    }; s052
+    
+    s053() {
+        avail_govs=$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_governors)
+        max_freq=$(cat /sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq)
+        
+        for proc_ppm in /sys/devices/system/cpu/cpu*/cpufreq
+        do
+            echo '$avail_govs' > $proc_ppm/scaling_governor
+            echo '$max_freq' > $proc_ppm/scaling_max_freq
+            echo '$max_freq' > $proc_ppm/scaling_min_freq
+        done
+    }; s053
+    
+    s054() {
+        for proc_ppm in /sys/devices/system/cpu/cpufreq/*
+        do
+            echo '0' > $proc_ppm/down_rate_limit_us
+            echo '0' > $proc_ppm/up_rate_limit_us
+        done
+    }; s054
+    
+    s055() {
+        for proc_ppm in $(find /sys/module/pstore/parameters/ -type f -name "compress")
+        do
+            echo 'deflate' > $proc_ppm
+        done
+    }; s055
+    
+    s056() {
+        for proc_ppm in $(find /sys/module/usbhid/parameters/ -type f -name "compress")
+        do
+            echo 'deflate' > $proc_ppm
+        done
+    }; s056
+}; ppm_mods_s000
 
 for logger in $PROC_PATH/ppm_logs
 do
-# logger
+# logger ppm only
     echo $PPM_PATH > $logger
 done
 
