@@ -13,13 +13,13 @@ s005() {
     else
         sed -i "/description=/c description=${VERIFY}" "$APPROVE"
     fi
-}; s005
+}
 
 s006() {
     (while :
     do
         sf=$(service list | grep -c "SurfaceFlinger")
-    
+        
         if [[ $sf -eq 1 ]]
         then
             service call SurfaceFlinger 1008 i32 1
@@ -35,7 +35,7 @@ s007() {
     (while :
     do
         sf=$(service list | grep -c "SurfaceFlinger")
-    
+        
         if [[ $sf -eq 1 ]]
         then
             service call SurfaceFlinger 1035 i32 0
@@ -48,7 +48,7 @@ s007() {
 }; s007
 
 s101() {
-    # Mediatek thermal both and other v3
+    # Function to find Mediatek thermal both and other v3
     if [[ -e "/vendor/etc/.tp" ]]
     then
         thermal_manager /vendor/etc/.tp/.ht120.mtc
@@ -79,7 +79,7 @@ s009() {
                 echo "Root script executed successfully"
             else
                 echo "Failed to execute root script skipped"
-                exit 1
+                exit 0
             fi
         fi
     else
@@ -96,6 +96,15 @@ s010() {
     if [[ -f "$PROC_PATH/root" ]]
     then
         . "${PROC_PATH}/root"
+        # Check if root script has been executed successfully
+        if [[ $? -eq 0 ]]
+        then
+            echo "Root script executed successfully"
+        else
+            echo "Failed to execute root script skipped"
+            exit 0
+        fi
+        
         log_info "Finished!"
     fi
 }; s010

@@ -18,12 +18,12 @@ ZIPFILE=$3
 mount /data 2>/dev/null
 
 # Check if Magisk util_functions.sh exists
-if [[ -f /data/adb/magisk/util_functions.sh ]]
+if [[ -f "/data/adb/magisk/util_functions.sh" ]]
 then
     . /data/adb/magisk/util_functions.sh
-    
     # Check if Android version is Android 10 or below
     ANDROID_VERSION=$(getprop ro.build.version.release)
+    
     if [[ "$ANDROID_VERSION" != "11" ]]
     then
         # Check if Magisk version is up to date

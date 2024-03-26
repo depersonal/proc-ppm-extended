@@ -5,7 +5,7 @@ debug.egl.force_msaa=true
 debug.egl.hw=1
 debug.sf.hw=1
 
-# Set default renderer to Skia but (Vulkan) can cause SystemUI bootloop
+# Set default renderer to Skia but ('skiavk' Vulkan) can causing SystemUI bootloop
 # debug.hwui.renderer=skiavk
 debug.hwui.renderer=skiagl
 ro.hwui.use_skia=true
@@ -14,7 +14,7 @@ ro.hwui.use_skia=true
 debug.hwui.render_dirty_regions=false
 hwui.render_dirty_regions=false
 
-# Force performance mode if supported by devices, including Snapdragon devices
+# Force performance mode if supported by devices default, including Snapdragon processor (SoC)
 debug.performance.tuning=1
 
 ro.mtk_perf_fast_start_win=1
@@ -36,6 +36,8 @@ ro.logd.size=0
 # Thanks to Konstantin and his project
 debug.composition.type=gpu
 # debug.composition.type=c2d
+# triggered -> cpu, gpu (both)
+# debug.composition.type=dyn
 debug.enabletr=true
 debug.overlayui.enable=1
 debug.qctwa.preservebuf=1
@@ -43,6 +45,8 @@ dev.pm.dyn_samplingrate=1
 hw3d.force=1
 persist.sys.composition.type=gpu
 # persist.sys.composition.type=c2d
+# triggered -> cpu, gpu (both)
+# persist.sys.composition.type=dyn
 persist.sys.ui.hw=1
 ro.fb.mode=1
 ro.sf.compbypass.enable=0
@@ -58,7 +62,7 @@ hwui.disable_vsync=true
 persist.sys.dalvik.hyperthreading=true
 persist.sys.dalvik.multithread=true
 
-# dca084a, 901b871, 2ec6373 by YiHo Cheng, davidchao, Cyan_Hsieh
+# Thermal mitigation diff(s) dca084a, 901b871, 2ec6373 by YiHo Cheng, davidchao, Cyan_Hsieh
 persist.vendor.disable.thermal.control=1
 persist.vendor.disable.usb.overheat.mitigation=1
 
@@ -79,4 +83,22 @@ vendor.debug.sf.latch_unsignaled=0
 
 # Mediatek thermal both and other v2
 vendor.thermal.manager.is_ht120=1
+# triggered -> thermal.off.conf, thermal.conf (both)
 # vendor.thermal.manager.is_ht120=0
+
+# Tweak the memory management of the device, enable more background apps et cetera, thanks to Antman2023 and his project. Android RAM management Things for this part.
+ro.config.fha_enable=true
+ro.sys.fw.bg_apps_limit=32
+ro.config.dha_cached_max=16
+ro.config.dha_empty_max=42
+ro.config.dha_empty_init=32
+ro.config.dha_lmk_scale=0.545
+ro.config.dha_th_rate=2.3
+ro.config.sdha_apps_bg_max=64
+ro.config.sdha_apps_bg_min=8
+# suggested by crok/crokrammgmtfix
+ro.sys.fw.bg_apps_limit=128
+ro.vendor.qti.sys.fw.bg_apps_limit=128
+ro.vendor.qti.sys.fw.bservice_enable=true
+ro.vendor.qti.sys.fw.bservice_age=10000
+ro.vendor.qti.sys.fw.bservice_limit=128

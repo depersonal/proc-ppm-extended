@@ -4,7 +4,7 @@ MODPROC="$PROC_PATH/$SCRIPT_NAME"
 
 touch /data/adb/modules/proc_ppm/update
 
-# Mediatek thermal both and other v1
+# Function to find Mediatek thermal both and other v1
 s100() {
     if [[ -e "/vendor/etc/.tp" ]]
     then
@@ -37,7 +37,7 @@ s001() {
     then
         rm -f "$PROC_PATH/error.log"
     fi
-
+    
     if [[ -e "$PROC_PATH/info.log" ]]
     then
         rm -f "$PROC_PATH/info.log"
@@ -61,7 +61,7 @@ s002() {
 
 # Function to set prop directly
 s003() {
-    ui_print "Prop directly (path=$PROC_PATH/proc.prop type=direct_executed vis=PRIVATE)"
+    ui_print "  Prop directly (path=$PROC_PATH/proc.prop type=direct_executed vis=PRIVATE)"
     resetprop -v -n --file "${PROC_PATH}/proc.prop"
 }; s003
 

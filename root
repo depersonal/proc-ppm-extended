@@ -2,7 +2,7 @@
 
 PROC_PATH="${0%/*}"
 
-PPM_PATH="$(cat /proc/ppm/*/*); $(cat /proc/ppm/*)"
+PPM_PATH="$(cat /proc/ppm/*/*)" || PPM_PATH="$(cat /proc/ppm/*)"
 MODPROC="/data/adb/modules/proc_ppm"
 INFO_LOG="${PROC_PATH}/info.log"
 ERROR_LOG="${PROC_PATH}/error.log"
@@ -14,6 +14,34 @@ BRANCH="mods"
 UINT_MAX="4294967295"
 SCHED_PERIOD="$((1 * 1000 * 1000))"
 SCHED_TASKS="10"
+
+_revert_back() {
+# make sure v1
+    if [[ "$(id -u)" -ne 0 ]]
+    then
+        for logger in $PROC_PATH/ppm_logs
+        do
+        # logger error only
+            echo "No root detected. proc_ppm exited." > $logger
+        done
+        
+        exit 1
+    fi
+}; _revert_back
+
+grep -q android /proc/cmdline && { 
+    ANDROID=true
+}
+
+_stats_reset() {
+    if true
+    then
+    # 'true' is the best way to make sure you're having dumpsys batterystats function
+        dumpsys batterystats --reset-all
+    else
+        dumpsys batterystats --reset
+    fi
+}; _stats_reset
 
 # Log the date and time for records sake
 echo "Time of execution: $(date)"
@@ -161,6 +189,12 @@ anti_debugging() {
         stop statsd || log_error "Failed to stop statsd service"
     fi
     
+    # Menghentikan servis perfd jika sedang berjalan
+    if [[ "$(getprop init.svc.perfd)" = running ]]
+    then
+        stop perfd || log_error "Failed to stop perfd service"
+    fi
+    
     # Menonaktifkan debugging di berbagai file dan direktori
     for proc_ppm in /proc/sys/{debug/exception-trace,fs/dir-notify-enable} \
         /proc/sys/debug/kernel/{compat_log,sched_schedstats} \
@@ -203,6 +237,7 @@ anti_debugging() {
 
 hrtick() {
     log_info "Trying to enable HRTICK"
+    
     sync # Sinkronisasi sebelum eksekusi untuk menghindari kehilangan data
     
     # Mencari semua file di direktori /proc/ppm dan mencoba mengaktifkan HRTICK
@@ -219,6 +254,7 @@ hrtick() {
 
 kprofile() {
     log_info "Applying Kernel Fix"
+    
     sync # Sinkronisasi sebelum eksekusi untuk menghindari kehilangan data
     
     # Mengatur nilai max_map_count untuk memperbaiki bug dari mainline kernel
@@ -232,6 +268,7 @@ kprofile() {
 
 kstune() {
     log_info "Applying stune tweaks"
+    
     sync # Sync before execution to avoid crashes
     
     # File dan nilai yang akan dimodifikasi
@@ -369,7 +406,7 @@ do
     avail_govs=$(cat $ppm_cpu/scaling_available_governors)
     
     # Attempt to set the governor in this order
-    for ppm_governor in schedutil interactive ondemand
+    for ppm_governor in performance schedutil interactive ondemand
     do
         # Once a matching governor is found, set it and break for this CPU
         if [[ "$avail_govs" == *"$ppm_governor"* ]]
@@ -381,7 +418,7 @@ do
 done
 
 # Apply governor specific tunables for CPUs
-find /sys/devices/system/cpu/ -name "schedutil" -o -name "interactive" -o -name "ondemand" -type d | while IFS= read -r ppm_governor
+find /sys/devices/system/cpu/ -name "performance" -o -name "schedutil" -o -name "interactive" -o -name "ondemand" -type d | while IFS= read -r ppm_governor
 do
     # Consider changing frequencies once per scheduling period
     write "$ppm_governor/up_rate_limit_us" 0
@@ -421,16 +458,20 @@ do
     write "$ppm_queue/nr_requests" 128
 done
 
-# _unfiltered_function() {
-#     
-# }; _unfiltered_function
+_unfiltered_function() {
+        chmod 666 /sys/module/lowmemorykiller/parameters/minfree
+        chown root /sys/module/lowmemorykiller/parameters/minfree
+        
+        echo '0' > /sys/module/lowmemorykiller/parameters/enable_adaptive_lmk
+        echo '21816,29088,36360,43632,50904,65448' > /sys/module/lowmemorykiller/parameters/minfree
+}; _unfiltered_function
 
 over_clock0() {
-    max_freq=$(cat /sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq)
+    min_freq=$(cat /sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq)
     
     for proc_ppm in $(find /sys/devices/system/cpu/cpu*/cpufreq/ -type f -name "cpuinfo_min_freq")
     do
-        echo '$max_freq' > $proc_ppm
+        echo '$min_freq' > $proc_ppm
     done
 }; over_clock0
 
@@ -493,13 +534,13 @@ ppm_mods_s002() {
     
     s037() {
         if [[ "$(ls /sys/block/zram*)" ]] && {
-            file_comp=$(cat /sys/block/zram*/max_comp_streams)
-            file_algorithm=$(cat /sys/block/zram*/comp_algorithm)
-            file_limit=$(cat /sys/block/zram*/mem_limit)
-            file_disksize=$(cat /sys/block/zram*/disksize)
+            file_comp=$(cat /sys/block/*/max_comp_streams)
+            file_algorithm=$(cat /sys/block/*/comp_algorithm)
+            file_limit=$(cat /sys/block/*/mem_limit)
+            file_disksize=$(cat /sys/block/*/disksize)
         }
         then
-            for proc_ppm in $(find /sys/block/zram*/ -type f -name "reset")
+            for proc_ppm in $(find /sys/block/*/ -type f -name "reset")
             do
                 echo '1' > $proc_ppm
             done
@@ -511,12 +552,12 @@ ppm_mods_s002() {
             echo '$file_algorithm' > $proc_ppm/comp_algorithm
         done
         
-        for proc_ppm in $(find /sys/block/zram*/ -type f -name "mem_limit")
+        for proc_ppm in $(find /sys/block/*/ -type f -name "mem_limit")
         do
             echo '$file_limit' > $proc_ppm
         done
         
-        for proc_ppm in $(find /sys/block/zram*/ -type f -name "disksize")
+        for proc_ppm in $(find /sys/block/*/ -type f -name "disksize")
         do
             echo '$file_disksize' > $proc_ppm
         done
@@ -526,23 +567,9 @@ ppm_mods_s002() {
     }; s037
 }; ppm_mods_s002
 
-s012() {
-# make sure v1
-    if [[ "$(id -u)" -ne 0 ]]
-    then
-        for logger in $PROC_PATH/ppm_logs
-        do
-        # logger error only
-    	    echo "No root detected. proc_ppm exited." > $logger
-    	done
-    	
-    	exit 1
-    fi
-}; s012
-
-grep -q android /proc/cmdline && { 
-    ANDROID=true
-}
+# s012() {
+#     
+# }; s012
 
 ppm_mods_s001() {
     s013() {
@@ -687,11 +714,11 @@ ppm_mods_s001() {
     
     s027() {
         if [[ "$(ls /sys/block/zram*)" ]] && {
-            file_min=$(cat /sys/block/zram*/min_free_kbytes)
-            file_extra=$(cat /sys/block/zram*/extra_free_kbytes)
+            file_min=$(cat /sys/block/*/min_free_kbytes)
+            file_extra=$(cat /sys/block/*/extra_free_kbytes)
         }
         then
-            for proc_ppm in $(find /sys/block/zram*/ -type f -name "reset")
+            for proc_ppm in $(find /sys/block/*/ -type f -name "reset")
             do
                 echo '1' > $proc_ppm/
             done
@@ -814,8 +841,8 @@ ppm_mods_s000() {
     
     s047() {
         if [[ "$(ls /sys/block/zram*)" ]] && {
-            file_min=$(cat /sys/block/zram*/min_free_kbytes)
-            file_extra=$(cat /sys/block/zram*/extra_free_kbytes)
+            file_min=$(cat /sys/block/*/min_free_kbytes)
+            file_extra=$(cat /sys/block/*/extra_free_kbytes)
         }
         then
             for proc_ppm in /sys/block/zram*
@@ -902,11 +929,11 @@ ppm_mods_s000() {
     
     s052() {
         if [[ "$(ls /sys/block/zram*)" ]] && {
-            file_comp=$(cat /sys/block/zram*/max_comp_streams)
-            file_disksize=$(cat /sys/block/zram*/disksize)
+            file_comp=$(cat /sys/block/*/max_comp_streams)
+            file_disksize=$(cat /sys/block/*/disksize)
         }
         then
-            for proc_ppm in $(find /sys/block/zram*/ -type f -name "initstate")
+            for proc_ppm in $(find /sys/block/*/ -type f -name "initstate")
             do
                 echo '1' > $proc_ppm
             done

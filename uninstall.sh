@@ -1,10 +1,27 @@
 # Hardcoded paths
 PROC_PATH="/data/adb/modules_update/proc_ppm"
 MODPROC="/data/adb/modules/proc_ppm"
-ROOT_FILE="/root/bootloop_indicator"
+ROOT_FILE="/data/adb/modules/proc_ppm" || ROOT_FILE="/data/adb/modules_update/proc_ppm"
 
 # Path to the directory where the symlink is located
 SYMLINK_PATH="$MODPROC/system/vendor/etc/.tp"
+
+# Check if the symlink exists
+if [[ -L "$SYMLINK_PATH" ]]
+then
+    # Unlink the symlink
+    unlink "$SYMLINK_PATH"
+    # Check if unlinking was successful
+    if [[ $? -eq 0 ]]
+    then
+        echo "Thermal symlink unlinked successfully"
+    else
+        echo "Failed to unlink thermal symlink skipped"
+        exit 0
+    fi
+else
+    echo "Thermal symlink does not exist, nothing to unlink"
+fi
 
 # Unlinked thermal Mediatek both and other
 if [[ -e "$MODPROC/system/vendor/etc/.tp" ]]
@@ -16,26 +33,8 @@ then
         echo "Thermal file unlinked successfully"
     else
         echo "Failed to unlink thermal file skipped"
-        exit 1
+        exit 0
     fi
-fi
-
-# Check if the symlink exists
-if [[ -L "$SYMLINK_PATH" ]]
-then
-    # Unlink the symlink
-    unlink "$SYMLINK_PATH"
-    
-    # Check if unlinking was successful
-    if [[ $? -eq 0 ]]
-    then
-        echo "Thermal symlink unlinked successfully"
-    else
-        echo "Failed to unlink thermal symlink skipped"
-        exit 1
-    fi
-else
-    echo "Thermal symlink does not exist, nothing to unlink"
 fi
 
 # Touch after execution to avoid bootloop
@@ -48,18 +47,18 @@ then
         echo "Root file unlinked successfully"
     else
         echo "Failed to unlink root file skipped"
-        exit 1
+        exit 0
     fi
 elif [[ -e "$ROOT_FILE" ]]
 then
-    touch "$MODPROC/disable"
+    touch "$ROOT_FILE/disable"
     # Check if disable file has been touched successfully
     if [[ $? -eq 0 ]]
     then
         echo "Disable file touched successfully"
     else
         echo "Failed to touch disable file skipped"
-        exit 1
+        exit 0
     fi
 fi
 
@@ -73,7 +72,7 @@ then
         echo "Error log file removed successfully"
     else
         echo "Failed to remove error log file skipped"
-        exit 1
+        exit 0
     fi
 fi
 
@@ -86,7 +85,7 @@ then
         echo "Info log file removed successfully"
     else
         echo "Failed to remove info log file skipped"
-        exit 1
+        exit 0
     fi
 fi
 
@@ -99,7 +98,7 @@ then
         echo "PPM logs file removed successfully"
     else
         echo "Failed to remove PPM logs file skipped"
-        exit 1
+        exit 0
     fi
 fi
 
