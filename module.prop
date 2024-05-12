@@ -1,6 +1,6 @@
-id=proc_ppm
-name=Proc ppm
-version=v3.4-0.0.3.4
-versionCode=0000304
-author=7secc, Konstantin, Hoshiyomi, Blanco
-description=Miscellaneous configurations for optimizing the /proc/ppm/ kernel profile.
+id=procmods_rvsd
+name=𝖯𝗋𝗈𝖼𝗆𝗈𝖽𝗌 | 𝖣𝗂𝗌𝖺𝖻𝗅𝖾 /𝗉𝗋𝗈𝖼/𝗉𝗉𝗆 𝗆𝗈𝖽𝗌
+version=v4.0-0.0.0.4
+versionCode=0000004
+author=@reversiond
+description=Disabled the /proc/ppm workflow to improve performance that is default limited by kernel.

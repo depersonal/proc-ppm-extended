@@ -1,76 +1,35 @@
-#!/system/bin/sh
+MODDIR="${0%/*}"
 
-PROC_PATH="${0%/*}"
-APPROVE="$PROC_PATH/module.prop"
-ACTIVE_STATUS="[+] Module is active but the function doesn't work properly"
-INACTIVE_STATUS="[-] Module is inactive"
+total_ram_kb="$(grep MemTotal /proc/meminfo | awk '{print $2}')"
+target_zram_size_mib="$(cat /sys/block/zram0/disksize)"
+zram_min_size_mib="$(cat /sys/block/zram0/disksize)"
+zram_size_reset="1"
 
-sync # Sync before execution to avoid crashes
-
-# Function to confirm module status and update module description accordingly
-s005() {
-    if [[ -f "$PROC_PATH/disable" ]]
-    then
-        sed -i "/description=/c description=${INACTIVE_STATUS}" "$APPROVE"
-    else
-        sed -i "/description=/c description=${ACTIVE_STATUS}" "$APPROVE"
+function wait_until_login() {
+    if [[ ! -f "/sys/block/zram0/disksize" ]] && {
+        [[ ! -f "/sys/block/zram0/reset" ]]
+    }; then
+        echo "ZRAM not available or not configured properly."
     fi
-}; s005
-
-s102() {
-    # Function to find Mediatek thermal both and other v4
-    if [[ -e "/vendor/etc/.tp" ]]
-    then
-        thermal_manager /vendor/etc/.tp/.ht120.mtc
-        resetprop -v -n vendor.thermal.manager.is_ht120 1
-    else
-        thermal_manager /vendor/etc/.tp/thermal.off.conf
-        resetprop -v -n vendor.thermal.manager.is_ht120 0
+    
+    swapoff /dev/block/zram0
+    
+    if [[ "$target_zram_size_mib" -gt "$total_ram_kb" ]]; then
+        echo "ZRAM capacity should not exceed total RAM."
     fi
-}; s102
-
-# Function to execute root script if present before boot (version 1)
-s006() {
-    if [[ -f "$PROC_PATH/root" ]]
-    then
-        sh "${PROC_PATH}/root"
-        # Check if root script has been executed successfully
-        if [[ $? -eq 0 ]]
-        then
-            echo "Root script executed successfully"
-        else
-            echo "Failed to execute root script skipped"
-            exit 0
-        fi
-    else
-        exec "${PROC_PATH}/root"
+    
+    if [[ "$target_zram_size_mib" -lt "$zram_min_size_mib" ]]; then
+        echo "ZRAM capacity should be at least $total_ram_kb."
     fi
-}; s006
+    
+    echo "$zram_size_reset" > /sys/block/zram0/reset
+    echo "$target_zram_size_mib" > /sys/block/zram0/disksize
+    
+    mkswap /dev/block/zram0
+    swapon /dev/block/zram0
+}; wait_until_login
 
-# Function to execute root script and apply boot options (version 2)
-s007() {
-    if [[ -f "$PROC_PATH/root" ]]
-    then
-        . "${PROC_PATH}/root"
-        # Check if root script has been executed successfully
-        if [[ $? -eq 0 ]]
-        then
-            echo "Root script executed successfully"
-        else
-            echo "Failed to execute root script skipped"
-            exit 0
-        fi
-        
-        log_init
-        log_info "Starting proc_ppm"
-        boot_opt_apply
-    fi
-}; s007
-
-# Function to set prop directly (version 3)
-s008() {
-    resetprop -v -n --file "${PROC_PATH}/proc.prop"
-}; s008
-
-# Update module description
-s005
+if [ -f "$MODDIR/procmods" ]; then
+    $MODDIR/procmods || exit 0; else
+    echo "  $(date) - File is missing?" > /sdcard/reversiond.log || exit 0
+fi

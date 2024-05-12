@@ -1,0 +1,625 @@
+#!/system/bin/sh
+
+MODDIR="${0%/*}"
+
+UINT_MAX="4294967295"
+SCHED_PERIOD="$((1 * 1000 * 1000))"
+SCHED_TASKS="10"
+
+write() {
+    [[ ! -f "$1" ]] && {
+        return 1
+    };
+    
+    chmod +w "$1" 2> /dev/null
+    if ! echo "$2" > "$1" 2> /dev/null; then
+        echo >> "$MODDIR/detected"
+        echo "  Failed: $1 → $2" >> "$MODDIR/detected"
+        echo >> "$MODDIR/detected"
+        return 1
+    fi
+    
+    echo "  $1 → $2" >> "$MODDIR/detected"
+};
+
+if [[ "$(id -u)" -ne "0" ]]; then
+    echo "  No root permissions. Exiting." || exit 1
+fi
+
+if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+    if [ -f "$MODDIR/detected" ]; then
+        rm "$MODDIR/detected"
+    fi
+fi
+
+grep -q android /proc/cmdline && {
+    ANDROID="true"
+};
+
+if [ -d "/proc/ppm" ]; then
+    if [ -f "$MODDIR/procmods" ]; then
+        chmod -R 777 /proc/ppm/**
+        chmod -R 777 /proc/cpufreq/**
+        chmod -R 777 /sys/module/ged/parameters/**
+        chmod -R 777 /sys/devices/virtual/thermal/thermal_zone*/**
+        chmod -R 777 /proc/driver/thermal/**
+        chmod -R 777 /sys/devices/system/cpu/cpu*/cpufreq/**
+        chmod -R 777 /sys/block/*/queue/**
+        chmod -R 777 /sys/devices/system/cpu/cpu*/cpuidle/**
+        chmod -R 777 /sys/class/power_supply/*/**
+    fi
+fi
+
+if [ -d "/proc/ppm" ]; then
+    function reversiond_0x0() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/ppm/ -type f -name "enabled"); do
+                avail_proc="$(cat $procmods)"
+                avail_rvsd=0 || avail_rvsd=1
+                for avail_mods in "ppm is enabled"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x0
+    
+    function reversiond_0x1() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/ppm/ -type f -name "policy_status"); do
+                for avail_mods in $(seq 0 15); do
+                    if [[ "$avail_mods" -eq "14" ]]; then
+                        echo $avail_mods 1 > "$procmods"; else
+                        echo $avail_mods 0 > "$procmods"
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x1
+    
+    function reversiond_0x2() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/ppm/profile/ -type f -name "profile_on"); do
+                avail_proc="$(cat $procmods)"
+                avail_rvsd=0 || avail_rvsd=1
+                for avail_mods in "1"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x2
+    
+    function reversiond_0x3() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/cpufreq/ -type f -name "cpufreq_power_mode"); do
+                avail_proc="$(cat $procmods)"
+                avail_rvsd=3 || avail_rvsd=0
+                for avail_mods in "Default(Normal) mode"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x3
+    
+    function reversiond_0x4() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/module/ged/parameters/ -type f -name "is_GED_KPI_enabled"); do
+                avail_proc="$(cat $procmods)"
+                avail_rvsd=1 || avail_rvsd=0
+                for avail_mods in "0"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x4
+    
+    function local() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/devices/virtual/thermal/thermal_zone*/ -type f -name "mode"); do
+                avail_proc="$(cat $procmods)"
+                avail_rvsd=disabled || avail_rvsd=enabled
+                for avail_mods in "enabled"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                    fi
+                done
+            done
+        fi
+    }; local
+    
+    function reversiond_0x5() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/driver/thermal/ -type f -name "tztsAll_enable"); do
+                avail_proc="$(cat $procmods)"
+                avail_rvsd="switch 0" || avail_rvsd="switch 1"
+                for avail_mods in "switch 1"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x5
+    
+    function reversiond_0x6() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/driver/thermal/ -type f -name "tztsAll_enable"); do
+                avail_proc="$(cat $procmods)"
+                avail_rvsd="polling_interval 0000" || avail_rvsd="polling_interval 1000"
+                for avail_mods in "polling_interval 1000"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x6
+    
+    function reversiond_0x7() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/devices/system/cpu/cpu*/cpufreq); do
+                avail_proc="$(cat "$procmods/scaling_available_governors")"
+                avail_rvsd="performance" || avail_rvsd="schedutil schedplus interactive ondemand conservative performance"
+                for avail_mods in $avail_rvsd; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_mods > "$procmods/scaling_governor"; else
+                        echo $avail_mods > "$procmods/scaling_governor"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x7
+    
+    function reversiond_0x8() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/block/*/queue/ -type f -name "scheduler"); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd="kyber" || avail_rvsd="cfq noop mq-deadline deadline kyber bfq none"
+                for avail_mods in $avail_rvsd; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_mods > "$procmods"; else
+                        echo $avail_mods > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x8
+    
+    function reversiond_0x9() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/devices/system/cpu/cpu*/cpuidle/state*/ -type f -name "disable"); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd=1 || avail_rvsd=0
+                for avail_mods in "0"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x9
+    
+    function reversiond_0x10() {
+        function reversiond_0s1() {
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/proc/sys/kernel/" ]]; then
+                    write /proc/sys/kernel/sched_min_task_util_for_colocation 0
+                    write /proc/sys/kernel/perf_cpu_time_max_percent 3
+                    write /proc/sys/kernel/printk_devkmsg off
+                    write /proc/sys/kernel/sched_autogroup_enabled 1
+                    write /proc/sys/kernel/sched_child_runs_first 1
+                    write /proc/sys/kernel/sched_latency_ns "$SCHED_PERIOD"
+                    write /proc/sys/kernel/sched_migration_cost_ns 5000000
+                    write /proc/sys/kernel/sched_min_granularity_ns "$((SCHED_PERIOD / SCHED_TASKS))"
+                    write /proc/sys/kernel/sched_nr_migrate 4
+                    write /proc/sys/kernel/sched_schedstats 0
+                    write /proc/sys/kernel/sched_tunable_scaling 0
+                    write /proc/sys/kernel/sched_wakeup_granularity_ns "$((SCHED_PERIOD / 2))"
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/proc/sys/net/ipv4/" ]]; then
+                    write /proc/sys/net/ipv4/tcp_ecn 1
+                    write /proc/sys/net/ipv4/tcp_fastopen 3
+                    write /proc/sys/net/ipv4/tcp_syncookies 0
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/proc/sys/vm/" ]]; then
+                    write /proc/sys/vm/dirty_background_ratio 3
+                    write /proc/sys/vm/dirty_expire_centisecs 3000
+                    write /proc/sys/vm/dirty_ratio 30
+                    write /proc/sys/vm/dirty_writeback_centisecs 3000
+                    write /proc/sys/vm/page-cluster 0
+                    write /proc/sys/vm/stat_interval 10
+                    write /proc/sys/vm/swappiness 100
+                    write /proc/sys/vm/vfs_cache_pressure 200
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -f "/sys/kernel/debug/sched_features" ]]; then
+                    write /sys/kernel/debug/sched_features NEXT_BUDDY
+                    write /sys/kernel/debug/sched_features NO_TTWU_QUEUE
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/stune/" ]]; then
+                    for procmods in $(find /dev/stune/*); do
+                        write "$procmods/schedtune.prefer_idle" 0
+                        write "$procmods/schedtune.boost" 1
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/devices/system/cpu/" ]]; then
+                    for procmods in $(find /sys/devices/system/cpu/cpu*/cpufreq); do
+                        avail_proc="$(cat "$procmods/scaling_available_governors")"
+                        for avail_mods in schedutil schedplus interactive ondemand conservative performance; do
+                            if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                                write "$procmods/scaling_governor" "$avail_mods"
+                                break
+                            fi
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/devices/system/cpu/" ]]; then
+                    find /sys/devices/system/cpu/ -name schedutil -o -name schedplus -o -name interactive -o -name ondemand -o -name conservative -o -name performance -type d | while IFS= read -r avail_mods; do
+                        write "$avail_mods/down_rate_limit_us" 0
+                        write "$avail_mods/go_hispeed_load" 85
+                        write "$avail_mods/hispeed_freq" "$UINT_MAX"
+                        write "$avail_mods/hispeed_load" 85
+                        write "$avail_mods/min_sample_time" 0
+                        write "$avail_mods/rate_limit_us" 0
+                        write "$avail_mods/timer_rate" 0
+                        write "$avail_mods/up_rate_limit_us" 0
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/block/" ]]; then
+                    for procmods in $(find /sys/block/*/queue -type f -name "scheduler"); do
+                        avail_proc="$(cat "$procmods")"
+                        for avail_mods in cfq noop mq-deadline deadline kyber bfq none; do
+                            if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                                write "$procmods" "$avail_mods"
+                                break
+                            fi
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/block/" ]]; then
+                    for procmods in $(find /sys/block/*/queue); do
+                        write "$procmods/add_random" 0
+                        write "$procmods/iostats" 0
+                        write "$procmods/read_ahead_kb" 32
+                        write "$procmods/nr_requests" 128
+                    done
+                fi
+            fi
+        }; reversiond_0s1
+        
+        function reversiond_0s2() {
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/stune/" ]]; then
+                    for procmods in $(find /dev/stune/ -type f -name "schedtune.boost"); do
+                        write "$procmods" 1
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/proc/sys/kernel/" ]]; then
+                    for procmods in $(find /proc/sys/kernel/ -type f -name "sched_cstate_aware" -o -name "sched_energy_aware"); do
+                        write "$procmods" 0
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/block/" ]]; then
+                    for procmods in $(find /sys/block/*/queue/ -type f -name "rq_affinity"); do
+                        write "$procmods" 0
+                    done
+                fi
+            fi
+        }; reversiond_0s2
+        
+        function reversiond_0s3() {
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/cpuset/cpu_limit/" ]]; then
+                    for procmods in $(find /dev/cpuset/cpu_limit/ -type f -name "cpus"); do
+                        write "$procmods" "0-0"
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/cpuset/top-app/" ]]; then
+                    for procmods in $(find /dev/cpuset/top-app/ -type f -name "cpus"); do
+                        avail_proc="0-3 4-7 0-7"
+                        for avail_mods in $avail_proc; do
+                            write "$procmods" "$avail_mods"
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/cpuset/system-background/" ]]; then
+                    for procmods in $(find /dev/cpuset/system-background/ -type f -name "cpus"); do
+                        avail_proc="0-3 4-7 0-7"
+                        for avail_mods in $avail_proc; do
+                            write "$procmods" "$avail_mods"
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/cpuset/restricted/" ]]; then
+                    for procmods in $(find /dev/cpuset/restricted/ -type f -name "cpus"); do
+                        write "$procmods" "0-0"
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/cpuset/foreground/" ]]; then
+                    for procmods in $(find /dev/cpuset/foreground/ -type f -name "cpus"); do
+                        avail_proc="0-3 4-7 0-7"
+                        for avail_mods in $avail_proc; do
+                            write "$procmods" "$avail_mods"
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/cpuset/camera-daemon/" ]]; then
+                    for procmods in $(find /dev/cpuset/camera-daemon/ -type f -name "cpus"); do
+                        avail_porc="0-3 4-7 0-7"
+                        for avail_mods in $avail_porc; do
+                            write "$procmods" "$avail_mods"
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/dev/cpuset/background/" ]]; then
+                    for procmods in $(find /dev/cpuset/background/ -type f -name "cpus"); do
+                        avail_porc="0-3 4-7 0-7"
+                        for avail_mods in $avail_proc; do
+                            write "$procmods" "$avail_mods"
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/block/" ]]; then
+                    for procmods in $(find /sys/block/zram*/ -type f -name "max_comp_streams"); do
+                        write "$procmods" 4
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/devices/system/cpu/" ]]; then
+                    for procmods in $(find /sys/devices/system/cpu/cpu*/cpufreq/ -type f -name "scaling_governor"); do
+                        avail_proc="$(cat "$procmods")"
+                        for avail_mods in $avail_proc; do
+                            write "$procmods" "$avail_mods"
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/devices/system/cpu/cpufreq/" ]]; then
+                    for procmods in $(find /sys/devices/system/cpu/cpufreq/*); do
+                        write "$procmods/above_hispeed_delay" 0
+                        write "$procmods/align_windows" 1
+                        write "$procmods/boost" 1
+                        write "$procmods/go_hispeed_load" 85
+                        write "$procmods/max_freq_hysteresis" 1
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/devices/system/cpu/cpufreq/" ]]; then
+                    for procmods in $(find /sys/devices/system/cpu/cpufreq/policy*/ -type f -name "scaling_governor"); do
+                        avail_proc="$(cat "$procmods")"
+                        for avail_mods in $avail_proc; do
+                            write "$procmods" "$avail_mods"
+                        done
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/kernel/gpu/" ]]; then
+                    for procmods in $(find /sys/kernel/gpu/ -type f -name "gpu_governor"); do
+                        write "$procmods" performance
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/module/adreno_idler/" ]]; then
+                    for procmods in $(find /sys/module/adreno_idler/parameters/ -type f -name "adreno_idler_active"); do
+                        write "$procmods" 0
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/module/lazyplug/" ]]; then
+                    for procmods in $(find /sys/module/lazyplug/parameters/ -type f -name "nr_possible_cores"); do
+                        write "$procmods" 8
+                    done
+                fi
+            fi
+            
+            if [[ "$ANDROID" == "true" ]]; then
+                if [[ -d "/sys/module/msm_performance/" ]]; then
+                    for procmods in $(find /sys/module/msm_performance/parameters/ -type f -name "touchboost"); do
+                        write "$procmods" 1
+                    done
+                fi
+            fi
+        }; reversiond_0s3
+    }; reversiond_0x10
+    
+    function reversiond_0x11() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/module/ged/parameters/*); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd=1 || avail_rvsd=0
+                for avail_mods in "0"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x11
+    
+    function reversiond_0x12() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/class/power_supply/*/ -type f -name "voltage_max"); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd=1 || avail_rvsd=0
+                for avail_mods in "0"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x12
+    
+    function reversiond_0x13() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/devices/system/cpu/perf/ -type f -name "enable"); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd=1 || avail_rvsd=0
+                for avail_mods in "0"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x13
+    
+    function reversiond_0x14() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/sys/kernel/random/ -type f -name "write_wakeup_threshold"); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd=4096 || avail_rvsd="$(cat /proc/sys/kernel/random/write_wakeup_threshold)"
+                for avail_mods in $avail_rvsd; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x14
+    
+    function reversiond_0x15() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/mtk_battery_cmd/ -type f -name "current_cmd"); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd="1 0" || avail_rvsd="0 0"
+                for avail_mods in "0 0"; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x15
+    
+    function reversiond_0x16() {
+        echo "  $(date) - File is found!
+        $MODDIR
+        " > /sdcard/status_reversiond.log || exit 0
+        chmod -R 755 /proc/ppm/**
+        chmod -R 755 /proc/cpufreq/**
+        chmod -R 755 /sys/module/ged/parameters/**
+        chmod -R 755 /sys/devices/virtual/thermal/thermal_zone*/**
+        chmod -R 755 /proc/driver/thermal/**
+        chmod -R 755 /sys/devices/system/cpu/cpu*/cpufreq/**
+        chmod -R 755 /sys/block/*/queue/**
+        chmod -R 755 /sys/devices/system/cpu/cpu*/cpuidle/**
+        chmod -R 755 /sys/class/power_supply/*/**
+    }; reversiond_0x16
+    
+    function reversiond_0x17() {
+        echo "  $(date) - File is found!
+        "$(cat /proc/ppm/enabled)"
+        "$(cat /proc/ppm/policy_status)"
+        "[$(cat /proc/ppm/profile/profile_on)] PROFILE_ON: disabled"
+        "[3] CPUFREQ_POWER_MODE: $(cat /proc/cpufreq/cpufreq_power_mode)"
+        "[$(cat /sys/module/ged/parameters/is_GED_KPI_enabled)] IS_GED_KPI_ENABLED: enabled"
+        "[0] THERMAL_ZONE_MODE: $(cat /sys/devices/virtual/thermal/thermal_zone*/mode)"
+        "$(cat /proc/driver/thermal/tztsAll_enable)"
+        " > /sdcard/reversiond.log || exit 0
+    }; reversiond_0x17
+fi
+
+if [ -d "/proc/ppm" ]; then
+    if [ -f "$MODDIR/changelog.md" ]; then
+        echo
+        echo "  $(date) - File is found!
+        $(cat $MODDIR/changelog.md)
+        " > /sdcard/changelog_reversiond.log || exit 0; else
+        echo "  $(date) - Some file are missing?" > /sdcard/changelog_reversiond.log || exit 0
+    fi
+fi

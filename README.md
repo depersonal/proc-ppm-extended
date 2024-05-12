@@ -1,1 +1,1 @@
-i hate open source, but that's alright
+i love open source,  that's alright
