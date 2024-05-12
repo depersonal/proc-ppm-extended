@@ -619,6 +619,38 @@ if [ -d "/proc/ppm" ]; then
     }; reversiond_0x17
     
     function reversiond_0x18() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /sys/class/power_supply/battery/ -type f -name "batt_reset_soc"); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd=1 || avail_rvsd=0
+                for avail_mods in $avail_rvsd; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x18
+    
+    function reversiond_0x19() {
+        if [ -n "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /data/system/ -type f -name "battery-usage-stats" -o -name "batterystats.bin" -o -name "battery-history" -o -name "batterystats-checkin.bin" -o -name "batterystats-daily.xml"); do
+                avail_proc="rm -rf"
+                avail_rvsd="$procmods" || avail_rvsd="$procmods"
+                for avail_mods in "$avail_rvsd"; do
+                    if [[ -f "$procmods" ]]; then
+                        $avail_proc $avail_mods; else
+                        $avail_proc $avail_mods
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x19
+    
+    function reversiond_0x20() {
         echo "  $(date) - File is found!
         $MODDIR
         " > /sdcard/status_reversiond.log || exit 0
@@ -631,9 +663,9 @@ if [ -d "/proc/ppm" ]; then
         chmod -R 755 /sys/block/*/queue/**
         chmod -R 755 /sys/devices/system/cpu/cpu*/cpuidle/**
         chmod -R 755 /sys/class/power_supply/*/**
-    }; reversiond_0x18
+    }; reversiond_0x20
     
-    function reversiond_0x19() {
+    function reversiond_0x21() {
         echo "  $(date) - File is found!
         "$(cat /proc/ppm/enabled)"
         "$(cat /proc/ppm/policy_status)"
@@ -643,7 +675,7 @@ if [ -d "/proc/ppm" ]; then
         "[0] THERMAL_ZONE_MODE: $(cat /sys/devices/virtual/thermal/thermal_zone*/mode)"
         "$(cat /proc/driver/thermal/tztsAll_enable)"
         " > /sdcard/reversiond.log || exit 0
-    }; reversiond_0x19
+    }; reversiond_0x21
 fi
 
 if [ -d "/proc/ppm" ]; then
