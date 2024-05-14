@@ -651,6 +651,22 @@ if [ -d "/proc/ppm" ]; then
     }; reversiond_0x19
     
     function reversiond_0x20() {
+        if [ -e "/data/adb/modules/procmods_rvsd" ]; then
+            for procmods in $(find /proc/ppm/policy/*); do
+                avail_proc="$(cat "$procmods")"
+                avail_rvsd=0 || avail_rvsd=1
+                for avail_mods in $avail_rvsd; do
+                    if [[ "$avail_proc" == *"$avail_mods"* ]]; then
+                        echo $avail_rvsd > "$procmods"; else
+                        echo $avail_rvsd > "$procmods"
+                        break
+                    fi
+                done
+            done
+        fi
+    }; reversiond_0x20
+    
+    function reversiond_0x21() {
         echo "  $(date) - File is found!
         $MODDIR
         " > /sdcard/status_reversiond.log || exit 0
@@ -663,9 +679,9 @@ if [ -d "/proc/ppm" ]; then
         chmod -R 755 /sys/block/*/queue/**
         chmod -R 755 /sys/devices/system/cpu/cpu*/cpuidle/**
         chmod -R 755 /sys/class/power_supply/*/**
-    }; reversiond_0x20
+    }; reversiond_0x21
     
-    function reversiond_0x21() {
+    function reversiond_0x22() {
         echo "  $(date) - File is found!
         "$(cat /proc/ppm/enabled)"
         "$(cat /proc/ppm/policy_status)"
@@ -675,7 +691,7 @@ if [ -d "/proc/ppm" ]; then
         "[0] THERMAL_ZONE_MODE: $(cat /sys/devices/virtual/thermal/thermal_zone*/mode)"
         "$(cat /proc/driver/thermal/tztsAll_enable)"
         " > /sdcard/reversiond.log || exit 0
-    }; reversiond_0x21
+    }; reversiond_0x22
 fi
 
 if [ -d "/proc/ppm" ]; then
